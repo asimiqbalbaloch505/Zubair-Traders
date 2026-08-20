@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Zubair Traders Bakery Management"
+description = "A wholesale bakery operations system for Zubair Traders to manage sales, buyers, udhaar, purchases, inventory, expenses, loans, and profitability in Pakistani Rupees."
+version = "1.0.0"
+id = "artifacts/zubair-traders"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25573
+
+[services.development]
+run = "pnpm --filter @workspace/zubair-traders run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/zubair-traders", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/zubair-traders/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25573"
+BASE_PATH = "/"

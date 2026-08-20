@@ -1,0 +1,88 @@
+Act as a Principal Full-Stack React Developer. Create a high-performance, ultra-professional Wholesale Bakery Management Web Software for "Zubair Traders" using React, Vite, TypeScript, Tailwind CSS, Lucide React icons, Framer Motion, jsPDF, and @supabase/supabase-js.
+
+---
+
+### DESIGN & DESIGN SYSTEM:
+- **Style:** Minimalist, sleek, modern, highly professional.
+- **Color Palette:** Pure white backgrounds (`#ffffff`), dark charcoal/black typography (`#111827`), subtle light gray borders (`#e5e7eb`), and high-contrast accents. Avoid rainbow colors or unnecessary clutter.
+- **Landing Page:** Beautiful hero section featuring smooth Framer Motion animations, subtle bakery background images (Unsplash high-res bakery/wheat imagery), key metric stats, feature highlights, and a primary CTA "Launch Dashboard / Login".
+
+---
+
+### SUPABASE SETUP & CONFIGURATION:
+
+1. Install required packages:
+   npm install @supabase/supabase-js lucide-react framer-motion jspdf jspdf-autotable clsx tailwind-merge
+
+2. Create `.env` file with:
+   VITE_SUPABASE_URL=https://wwjbsgyavygrlgbifynp.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_3zTEu4ZwQqv4cFlpOtB5EQ_IyP9RRpF
+
+3. Setup `src/utils/supabase.ts`:
+   import { createClient } from '@supabase/supabase-js';
+
+   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+   export const supabase = createClient(supabaseUrl, supabaseKey);
+
+4. Integrate Agent Skills:
+   Execute `npx skills add supabase/agent-skills` for AI database capabilities.
+
+---
+
+### DATABASE TABLES (Connect to existing Supabase Schema):
+- `buyers`: id, name, phone, cnic (13-digit Pakistani CNIC), address, credit_limit, current_balance, created_at
+- `suppliers`: id, name, phone, company_name (optional), cnic (optional), address, current_balance, created_at
+- `products`: id, name, unit, default_purchase_cost, default_selling_price, stock_quantity, min_stock_alert, created_at
+- `buyer_custom_prices`: id, buyer_id, product_id, custom_price
+- `sales_invoices`: id, invoice_number, buyer_id, total_amount, paid_amount, due_amount, payment_status ('PAID', 'PARTIALLY_PAID', 'DUE'), notes, transaction_time
+- `sales_invoice_items`: id, invoice_id, product_id, quantity, unit_price, unit_cost, subtotal
+- `purchase_invoices`: id, purchase_number, supplier_id, total_amount, paid_amount, due_amount, payment_status, notes, transaction_time
+- `purchase_invoice_items`: id, purchase_id, product_id, quantity, purchase_cost, subtotal
+- `loans`: id, person_name, phone, loan_type ('BORROWED', 'LENT'), amount, balance_remaining, description, date_given
+- `loan_payments`: id, loan_id, amount_paid, payment_date, notes
+- `expenses`: id, category, amount, description, expense_date
+
+---
+
+### CORE MODULES & FEATURES:
+
+1. **Dashboard & Analytics:**
+   - Display key metrics in PKR: Daily Sales (PKR), Today's Profit (PKR), Total Buyer Debt (Udhaar), Total Owed to Suppliers, Cash in Drawer.
+   - Low Stock Alert Notifications box that alerts the owner when inventory drops below `min_stock_alert`.
+   - Send low stock alert notifications to owner WhatsApp (Primary contact: 03429711001).
+
+2. **Buyers (Customers) & Udhaar Tracker:**
+   - Add/Edit Buyers (Name, Phone, mandatory Pakistani CNIC, Address, Credit Limit).
+   - Display total credit balance in PKR per buyer.
+   - Set custom price tiers per buyer for specific bakery items.
+
+3. **Suppliers & Purchases:**
+   - Add/Edit Suppliers (Name, Phone, Optional Company Name, Optional CNIC).
+   - Purchase Entry Screen: Select supplier, pick items, manually edit/adjust purchase unit cost per item on the spot, set payment status (PAID/PARTIALLY_PAID/DUE).
+   - Automatically increments product stock on submission.
+
+4. **Sales Billing & Invoice Generator (POS):**
+   - Quick order screen: Pick Buyer, auto-fill custom price if set, add items, set quantities.
+   - Enter Cash Paid (PKR). System auto-calculates Due Balance (PKR) and sets status (PAID, PARTIALLY_PAID, DUE).
+   - Generates branded **Zubair Traders** PDF invoice using jsPDF featuring: Header, Invoice #, Date/Timestamp, Buyer CNIC, Itemized table (PKR), Paid Amount, Remaining Balance.
+   - **1-Click WhatsApp Button:** Generates the invoice and opens WhatsApp Web/API to instantly send the document link or summary directly to the buyer's phone number or target contact (03429711001).
+
+5. **Inventory & Products:**
+   - Add/Edit Finished Bakery Products (Name, Unit, Stock Count, Default Purchase Price PKR, Default Selling Price PKR, Low Stock Threshold).
+
+6. **Loans & Shop Expenses:**
+   - Record Loans Given (Lent) or Money Borrowed with balance tracking.
+   - Log daily shop expenses in PKR (Rent, Electricity, Tea/Food, Salaries, Fuel).
+
+7. **Profitability & Reports:**
+   - Net Profit Calculator: `Sales Revenue (PKR) - Cost of Goods Sold (PKR) - Expenses (PKR)`.
+   - Full printable receivables (Udhaar) list with buyer CNIC and total due balances.
+
+---
+
+### CONSTRAINTS:
+- Display all currency formatted explicitly in Pakistani Rupees (**PKR**).
+- Stamp every invoice, purchase, stock update, and expense entry with an accurate Date and Timestamp (`TIMESTAMPTZ`).
+- Ensure UI/UX requires zero paper writing—everything must be accessible within 1-2 clicks.
