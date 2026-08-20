@@ -8,12 +8,30 @@ import {
   RefreshCw, Search, Settings2, ShoppingCart, Store, Truck, UserRound, Users, Wallet, X,
 } from 'lucide-react';
 import {
-  getGetBuyersQueryKey, getGetDashboardQueryKey, getGetExpensesQueryKey, getGetLoansQueryKey,
-  getGetProductsQueryKey, getGetSalesQueryKey, getGetSuppliersQueryKey, getHealthCheckQueryKey,
-  useCreateBuyer, useCreateExpense, useCreateLoan, useCreateProduct, useCreateSale, useCreateSupplier,
-  useGetBuyers, useGetDashboard, useGetExpenses, useGetLoans, useGetProducts, useGetSales,
-  useGetSuppliers, useHealthCheck, useUpdateBuyer,
-} from '@workspace/api-client-react';
+  getGetBuyersQueryKey,
+  getGetDashboardQueryKey,
+  getGetExpensesQueryKey,
+  getGetLoansQueryKey,
+  getGetProductsQueryKey,
+  getGetSalesQueryKey,
+  getGetSuppliersQueryKey,
+  getHealthCheckQueryKey,
+  useCreateBuyer,
+  useCreateExpense,
+  useCreateLoan,
+  useCreateProduct,
+  useCreateSale,
+  useCreateSupplier,
+  useGetBuyers,
+  useGetDashboard,
+  useGetExpenses,
+  useGetLoans,
+  useGetProducts,
+  useGetSales,
+  useGetSuppliers,
+  useHealthCheck,
+  useUpdateBuyer,
+} from './hooks/useSupabaseData';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
