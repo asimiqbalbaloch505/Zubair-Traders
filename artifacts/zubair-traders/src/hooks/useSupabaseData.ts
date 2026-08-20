@@ -6,7 +6,7 @@ export function useGetDashboard(_options?: any) {
     queryKey: ['dashboard'],
     queryFn: async () => {
       const [{ data: sales }, { data: products }, { data: buyers }, { data: suppliers }] = await Promise.all([
-        supabase.from('sales').select('*'),
+        supabase.from('sales_invoices').select('*'),
         supabase.from('products').select('*'),
         supabase.from('buyers').select('*'),
         supabase.from('suppliers').select('*'),
@@ -15,7 +15,7 @@ export function useGetDashboard(_options?: any) {
       const dailySales = sales?.reduce((acc, s) => acc + (Number(s.total_amount) || 0), 0) || 0;
       const buyerDebt = buyers?.reduce((acc, b) => acc + (Number(b.current_balance) || 0), 0) || 0;
       const supplierOwed = suppliers?.reduce((acc, s) => acc + (Number(s.current_balance) || 0), 0) || 0;
-      const lowStock = products?.filter(p => p.stock_quantity <= p.min_stock_alert) || [];
+      const lowStock = products?.filter(p => (p.stock_quantity || 0) <= (p.min_stock_alert || 0)) || [];
 
       return {
         dailySales,
@@ -77,7 +77,7 @@ export function useCreateBuyer() {
 export function useUpdateBuyer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string | number; data: any }) => {
       const { data: res, error } = await supabase.from('buyers').update({
         name: data.name,
         phone: data.phone,
@@ -96,17 +96,17 @@ export function useGetSales(_options?: any) {
   return useQuery({
     queryKey: ['sales'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('sales').select('*, buyers(name)');
+      const { data, error } = await supabase.from('sales_invoices').select('*, buyers(name)');
       if (error) throw error;
       return (data || []).map(s => ({
         id: s.id,
-        invoiceNumber: s.invoice_number || `INV-${s.id}`,
+        invoiceNumber: s.invoice_number ? `INV-${s.invoice_number}` : `INV-${s.id}`,
         buyerName: s.buyers?.name || 'Walk-in',
         totalAmount: s.total_amount,
         paidAmount: s.paid_amount,
-        dueAmount: s.total_amount - s.paid_amount,
+        dueAmount: s.due_amount ?? ((s.total_amount || 0) - (s.paid_amount || 0)),
         paymentStatus: s.payment_status,
-        transactionTime: s.created_at,
+        transactionTime: s.transaction_time || s.created_at,
       }));
     },
   });
@@ -116,10 +116,11 @@ export function useCreateSale() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ data }: { data: any }) => {
-      const { data: res, error } = await supabase.from('sales').insert([{
+      const { data: res, error } = await supabase.from('sales_invoices').insert([{
         buyer_id: data.buyerId,
         total_amount: data.totalAmount,
         paid_amount: data.paidAmount,
+        due_amount: data.totalAmount - data.paidAmount,
         payment_status: data.paymentStatus,
         notes: data.notes,
       }]).select();
@@ -158,6 +159,7 @@ export function useCreateSupplier() {
         name: data.name,
         phone: data.phone,
         company_name: data.companyName,
+        cnic: data.cnic,
         address: data.address,
       }]).select();
       if (error) throw error;
@@ -177,8 +179,8 @@ export function useGetProducts(_options?: any) {
         id: p.id,
         name: p.name,
         unit: p.unit,
-        purchaseCost: p.purchase_cost,
-        sellingPrice: p.selling_price,
+        purchaseCost: p.default_purchase_cost,
+        sellingPrice: p.default_selling_price,
         stockQuantity: p.stock_quantity,
         minStockAlert: p.min_stock_alert,
       }));
@@ -193,8 +195,8 @@ export function useCreateProduct() {
       const { data: res, error } = await supabase.from('products').insert([{
         name: data.name,
         unit: data.unit,
-        purchase_cost: data.purchaseCost,
-        selling_price: data.sellingPrice,
+        default_purchase_cost: data.purchaseCost,
+        default_selling_price: data.sellingPrice,
         stock_quantity: data.stockQuantity,
         min_stock_alert: data.minStockAlert,
       }]).select();
@@ -252,7 +254,7 @@ export function useGetLoans(_options?: any) {
         loanType: l.loan_type,
         amount: l.amount,
         balanceRemaining: l.balance_remaining,
-        dateGiven: l.created_at,
+        dateGiven: l.date_given || l.created_at,
       }));
     },
   });
