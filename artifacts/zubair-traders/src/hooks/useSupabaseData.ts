@@ -169,32 +169,53 @@ export function useGetSales() {
       }
 
       return (data || []).map((s: any) => {
-        // Standardize status for exact UI filter matches
         let status = String(s.payment_status || 'unpaid').toLowerCase();
         if (status === 'partially_paid' || status === 'partially paid') status = 'partial';
         if (status === 'due') status = 'unpaid';
 
+        const mappedItems = (s.sales_invoice_items || []).map((item: any) => {
+          const pName = item.products?.name || item.product_name || 'Item';
+          return {
+            id: item.id,
+            productId: item.product_id,
+            product_id: item.product_id,
+            productName: pName,
+            product_name: pName,
+            name: pName,
+            quantity: item.quantity,
+            qty: item.quantity,
+            unitPrice: item.unit_price,
+            unit_price: item.unit_price,
+            price: item.unit_price,
+            unitCost: item.unit_cost,
+            unit_cost: item.unit_cost,
+            subtotal: item.subtotal || (item.quantity * item.unit_price),
+            total_price: item.subtotal || (item.quantity * item.unit_price)
+          };
+        });
+
         return {
           id: s.id,
           invoiceNumber: s.invoice_number ? `INV-${s.invoice_number}` : `INV-${s.id}`,
+          invoice_number: s.invoice_number,
           buyerName: s.buyers?.name || 'Walk-in',
           totalAmount: s.total_amount,
+          total_amount: s.total_amount,
           paidAmount: s.paid_amount,
+          paid_amount: s.paid_amount,
           dueAmount: s.due_amount ?? ((s.total_amount || 0) - (s.paid_amount || 0)),
-          paymentStatus: status, // Matches 'paid', 'partial', 'unpaid'
-          rawPaymentStatus: s.payment_status,
+          due_amount: s.due_amount ?? ((s.total_amount || 0) - (s.paid_amount || 0)),
+          paymentStatus: status,
+          payment_status: status,
           transactionTime: s.transaction_time,
+          transaction_time: s.transaction_time,
           notes: s.notes,
-          items: (s.sales_invoice_items || []).map((item: any) => ({
-            id: item.id,
-            productId: item.product_id,
-            productName: item.products?.name || 'Unknown Product',
-            name: item.products?.name || 'Unknown Product', // Included for legacy UI compatibility
-            quantity: item.quantity,
-            unitPrice: item.unit_price,
-            unitCost: item.unit_cost,
-            subtotal: item.subtotal
-          }))
+          
+          // Provide alias keys so modal components using legacy property names bind instantly
+          items: mappedItems,
+          sales_items: mappedItems,
+          sale_items: mappedItems,
+          sales_invoice_items: mappedItems
         };
       });
     }
