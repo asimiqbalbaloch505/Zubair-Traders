@@ -169,6 +169,24 @@ export function useCreateSupplier() {
   });
 }
 
+export function useUpdateSupplier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string | number; data: any }) => {
+      const { data: res, error } = await supabase.from('suppliers').update({
+        name: data.name,
+        phone: data.phone,
+        company_name: data.companyName,
+        cnic: data.cnic,
+        address: data.address,
+      }).eq('id', id).select();
+      if (error) throw error;
+      return res;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
+  });
+}
+
 export function useGetProducts(_options?: any) {
   return useQuery({
     queryKey: ['products'],
