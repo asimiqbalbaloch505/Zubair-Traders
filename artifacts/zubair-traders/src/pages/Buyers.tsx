@@ -31,7 +31,13 @@ export function Buyers({ PageIntro, Button, Field, Modal, Loading, Failed, Empty
     setEditing(b || null);
     setForm(
       b 
-        ? { name: b.name, phone: b.phone, cnic: b.cnic || '', address: b.address || '', creditLimit: String(b.creditLimit || '') } 
+        ? { 
+            name: b.name, 
+            phone: b.phone || '', 
+            cnic: b.cnic || '', 
+            address: b.address || '', 
+            creditLimit: String(b.creditLimit ?? b.credit_limit ?? '') 
+          } 
         : blank
     );
     setModal(true);
@@ -55,12 +61,12 @@ export function Buyers({ PageIntro, Button, Field, Modal, Loading, Failed, Empty
   return (
     <div className="animate-in">
       <PageIntro 
-        eyebrow="People who keep the ovens moving" 
-        title="Buyers" 
+        eyebrow="People who keep the business moving" 
+        title="Customers" 
         detail="Know who owes, what they buy, and where to reach them." 
         action={
           <Button onClick={() => open()} testId="button-add-buyer">
-            <Plus size={16} /> Add buyer
+            <Plus size={16} /> Add customer
           </Button>
         } 
       />
@@ -77,7 +83,7 @@ export function Buyers({ PageIntro, Button, Field, Modal, Loading, Failed, Empty
               className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm outline-none focus:border-primary" 
             />
           </div>
-          <div className="font-mono text-xs text-muted-foreground">{list.length} buyers</div>
+          <div className="font-mono text-xs text-muted-foreground">{list.length} customers</div>
         </div>
 
         {q.isLoading ? (
@@ -89,7 +95,7 @@ export function Buyers({ PageIntro, Button, Field, Modal, Loading, Failed, Empty
             <table className="w-full min-w-[700px] text-left text-sm">
               <thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th className="pb-3">Buyer</th>
+                  <th className="pb-3">Customer</th>
                   <th className="pb-3">Phone</th>
                   <th className="pb-3">Credit limit</th>
                   <th className="pb-3">Current udhaar</th>
@@ -97,40 +103,45 @@ export function Buyers({ PageIntro, Button, Field, Modal, Loading, Failed, Empty
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/70">
-                {list.map((b: any) => (
-                  <tr key={b.id} data-testid={`row-buyer-${b.id}`}>
-                    <td className="py-3">
-                      <div className="font-semibold">{b.name}</div>
-                      <div className="text-[11px] text-muted-foreground">{b.address || 'No address'}</div>
-                    </td>
-                    <td className="py-3 font-mono text-xs">{b.phone}</td>
-                    <td className="py-3 font-mono">{money(b.creditLimit)}</td>
-                    <td className="py-3">
-                      <span className={`font-mono font-bold ${b.currentBalance > 0 ? 'text-accent' : 'text-emerald-700'}`}>
-                        {money(b.currentBalance)}
-                      </span>
-                    </td>
-                    <td className="py-3 text-right">
-                      <button 
-                        data-testid={`button-edit-buyer-${b.id}`} 
-                        onClick={() => open(b)} 
-                        className="rounded-md p-2 text-muted-foreground hover:bg-muted"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {list.map((b: any) => {
+                  const balance = b.currentBalance ?? b.current_balance ?? 0;
+                  const limit = b.creditLimit ?? b.credit_limit ?? 0;
+
+                  return (
+                    <tr key={b.id} data-testid={`row-buyer-${b.id}`}>
+                      <td className="py-3">
+                        <div className="font-semibold">{b.name}</div>
+                        <div className="text-[11px] text-muted-foreground">{b.address || 'No address'}</div>
+                      </td>
+                      <td className="py-3 font-mono text-xs">{b.phone || '-'}</td>
+                      <td className="py-3 font-mono">{money(limit)}</td>
+                      <td className="py-3">
+                        <span className={`font-mono font-bold ${balance > 0 ? 'text-accent' : 'text-emerald-700'}`}>
+                          {money(balance)}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right">
+                        <button 
+                          data-testid={`button-edit-buyer-${b.id}`} 
+                          onClick={() => open(b)} 
+                          className="rounded-md p-2 text-muted-foreground hover:bg-muted"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         ) : (
           <Empty 
-            title={search ? 'No buyers match that search' : 'Your buyer book is empty'} 
-            detail="Add your first wholesale buyer to start tracking udhaar." 
+            title={search ? 'No customers match that search' : 'Your customer book is empty'} 
+            detail="Add your first wholesale customer to start tracking udhaar." 
             action={!search && (
               <Button onClick={() => open()} testId="button-empty-add-buyer">
-                <Plus size={15} /> Add buyer
+                <Plus size={15} /> Add customer
               </Button>
             )} 
           />
@@ -138,7 +149,7 @@ export function Buyers({ PageIntro, Button, Field, Modal, Loading, Failed, Empty
       </div>
 
       {modal && (
-        <Modal title={editing ? 'Edit buyer' : 'Add buyer'} eyebrow="Buyer book" onClose={() => setModal(false)}>
+        <Modal title={editing ? 'Edit customer' : 'Add customer'} eyebrow="Customer book" onClose={() => setModal(false)}>
           <form onSubmit={submit} className="grid gap-3">
             <Field label="Name" name="buyer-name" value={form.name} onChange={(v: string) => setForm({ ...form, name: v })} required />
             <div className="grid grid-cols-2 gap-3">
@@ -148,7 +159,7 @@ export function Buyers({ PageIntro, Button, Field, Modal, Loading, Failed, Empty
             <Field label="Address" name="buyer-address" value={form.address} onChange={(v: string) => setForm({ ...form, address: v })} />
             <Field label="Credit limit" name="buyer-limit" type="number" value={form.creditLimit} onChange={(v: string) => setForm({ ...form, creditLimit: v })} required />
             <Button type="submit" disabled={create.isPending || update.isPending} testId="button-save-buyer">
-              {create.isPending || update.isPending ? 'Saving…' : 'Save buyer'}
+              {create.isPending || update.isPending ? 'Saving…' : 'Save customer'}
             </Button>
           </form>
         </Modal>

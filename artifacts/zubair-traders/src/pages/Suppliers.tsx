@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Pencil, Truck } from 'lucide-react';
+import { Plus, Search, Pencil } from 'lucide-react';
 import { 
   useGetSuppliers, 
   getGetSuppliersQueryKey, 
@@ -22,16 +22,22 @@ export function Suppliers({ PageIntro, Button, Field, Modal, Loading, Failed, Em
   const [form, setForm] = useState(blank);
 
   const list = useMemo(() => {
-    return (q.data || []).filter((s: any) => 
-      `${s.name} ${s.phone} ${s.company || ''}`.toLowerCase().includes(search.toLowerCase())
-    );
+    return (q.data || []).filter((s: any) => {
+      const company = s.companyName || s.company_name || s.company || '';
+      return `${s.name} ${s.phone || ''} ${company}`.toLowerCase().includes(search.toLowerCase());
+    });
   }, [q.data, search]);
 
   const open = (s?: any) => {
     setEditing(s || null);
     setForm(
       s 
-        ? { name: s.name, phone: s.phone, company: s.company || '', address: s.address || '' } 
+        ? { 
+            name: s.name || '', 
+            phone: s.phone || '', 
+            company: s.companyName || s.company_name || s.company || '', 
+            address: s.address || '' 
+          } 
         : blank
     );
     setModal(true);
@@ -39,15 +45,20 @@ export function Suppliers({ PageIntro, Button, Field, Modal, Loading, Failed, Em
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      ...form,
+      companyName: form.company, // Sends both variants for hook compatibility
+    };
+
     const finish = () => {
       qc.invalidateQueries({ queryKey: getGetSuppliersQueryKey() });
       setModal(false);
     };
 
     if (editing) {
-      update.mutate({ id: editing.id, data: form }, { onSuccess: finish });
+      update.mutate({ id: editing.id, data: payload }, { onSuccess: finish });
     } else {
-      create.mutate({ data: form }, { onSuccess: finish });
+      create.mutate({ data: payload }, { onSuccess: finish });
     }
   };
 
@@ -96,30 +107,35 @@ export function Suppliers({ PageIntro, Button, Field, Modal, Loading, Failed, Em
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/70">
-                {list.map((s: any) => (
-                  <tr key={s.id} data-testid={`row-supplier-${s.id}`}>
-                    <td className="py-3">
-                      <div className="font-semibold">{s.name}</div>
-                      <div className="text-[11px] text-muted-foreground">{s.address || 'No address'}</div>
-                    </td>
-                    <td className="py-3 font-medium">{s.company || '—'}</td>
-                    <td className="py-3 font-mono text-xs">{s.phone}</td>
-                    <td className="py-3">
-                      <span className={`font-mono font-bold ${s.currentBalance > 0 ? 'text-amber-600' : 'text-emerald-700'}`}>
-                        {money(s.currentBalance)}
-                      </span>
-                    </td>
-                    <td className="py-3 text-right">
-                      <button 
-                        data-testid={`button-edit-supplier-${s.id}`} 
-                        onClick={() => open(s)} 
-                        className="rounded-md p-2 text-muted-foreground hover:bg-muted"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {list.map((s: any) => {
+                  const company = s.companyName ?? s.company_name ?? s.company ?? '—';
+                  const balance = s.currentBalance ?? s.current_balance ?? 0;
+
+                  return (
+                    <tr key={s.id} data-testid={`row-supplier-${s.id}`}>
+                      <td className="py-3">
+                        <div className="font-semibold">{s.name}</div>
+                        <div className="text-[11px] text-muted-foreground">{s.address || 'No address'}</div>
+                      </td>
+                      <td className="py-3 font-medium">{company}</td>
+                      <td className="py-3 font-mono text-xs">{s.phone || '-'}</td>
+                      <td className="py-3">
+                        <span className={`font-mono font-bold ${balance > 0 ? 'text-amber-600' : 'text-emerald-700'}`}>
+                          {money(balance)}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right">
+                        <button 
+                          data-testid={`button-edit-supplier-${s.id}`} 
+                          onClick={() => open(s)} 
+                          className="rounded-md p-2 text-muted-foreground hover:bg-muted"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

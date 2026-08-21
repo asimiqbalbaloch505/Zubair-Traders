@@ -10,13 +10,15 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
         { data: products },
         { data: buyers },
         { data: suppliers },
-        { data: expenses }
+        { data: expenses },
+        { data: purchases }
       ] = await Promise.all([
         supabase.from('sales_invoices').select('*'),
         supabase.from('products').select('*'),
         supabase.from('buyers').select('*'),
         supabase.from('suppliers').select('*'),
         supabase.from('expenses').select('*'),
+        supabase.from('purchases').select('*'),
       ]);
 
       if (errSales) console.error('Sales fetch error:', errSales);
@@ -51,6 +53,7 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
 
       const filteredSales = sales?.filter(s => isWithinFilter(s.created_at || s.transaction_time)) || [];
       const filteredExpenses = expenses?.filter(e => isWithinFilter(e.expense_date || e.created_at)) || [];
+      const filteredPurchases = purchases?.filter(p => isWithinFilter(p.created_at || p.transaction_time)) || [];
 
       const totalSales = filteredSales.reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0);
       const totalExpenses = filteredExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
@@ -60,7 +63,9 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
         ? (buyers?.reduce((acc, b) => acc + (Number(b.current_balance ?? b.currentBalance) || 0), 0) || 0)
         : filteredSales.reduce((acc, s) => acc + (Number(s.due_amount ?? s.dueAmount ?? ((s.total_amount || 0) - (s.paid_amount || 0))) || 0), 0);
 
-      const totalSupplierPayables = suppliers?.reduce((acc, s) => acc + (Number(s.current_balance ?? s.currentBalance) || 0), 0) || 0;
+      const totalSupplierPayables = filter === 'all_time'
+        ? (suppliers?.reduce((acc, s) => acc + (Number(s.current_balance ?? s.currentBalance) || 0), 0) || 0)
+        : filteredPurchases.reduce((acc, p) => acc + (Number(p.due_amount ?? p.dueAmount ?? ((p.total_amount || 0) - (p.paid_amount || 0))) || 0), 0);
 
       const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const salesTrend = Array.from({ length: 7 }).map((_, i) => {
@@ -91,6 +96,7 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
     },
   });
 }
+
 
 export function useGetBuyers(_options?: any) {
   return useQuery({
@@ -239,21 +245,25 @@ export function useCreateSale() {
 
       const total = Number(data.totalAmount ?? data.total_amount ?? 0);
       const paid = Number(data.paidAmount ?? data.paid_amount ?? 0);
+      const due = total - paid;
+      const buyerId = data.buyerId || data.buyer_id;
 
+      // 1. Insert Invoice
       const { data: resInvoice, error: invError } = await supabase.from('sales_invoices').insert([{
-        buyer_id: data.buyerId || data.buyer_id,
+        buyer_id: buyerId,
         total_amount: total,
         paid_amount: paid,
-        due_amount: total - paid,
+        due_amount: due,
         payment_status: dbStatus,
         notes: data.notes || null,
       }]).select().single();
 
       if (invError) throw invError;
 
+      // 2. Insert Invoice Items & Deduct Stock
       if (data.items && data.items.length > 0) {
         const lineItems = data.items.map((item: any) => ({
-          invoice_id: resInvoice.id, // Fixed: Uses invoice_id column
+          invoice_id: resInvoice.id,
           product_id: item.productId || item.product_id,
           quantity: Number(item.quantity || item.qty || 1),
           unit_price: Number(item.unitPrice || item.unit_price || 0),
@@ -261,15 +271,55 @@ export function useCreateSale() {
           subtotal: Number(item.subtotal || item.totalPrice || (item.quantity * item.unitPrice) || 0)
         }));
 
-        // Fixed: Inserts into sales_invoice_items
         const { error: itemsError } = await supabase.from('sales_invoice_items').insert(lineItems);
         if (itemsError) console.error('Item insertion failed:', itemsError.message);
+
+        // Inventory Stock Deduction
+        for (const item of data.items) {
+          const prodId = item.productId || item.product_id;
+          const qtySold = Number(item.quantity || item.qty || 1);
+
+          const { data: currentProd } = await supabase
+            .from('products')
+            .select('stock_quantity')
+            .eq('id', prodId)
+            .single();
+
+          if (currentProd) {
+            const currentStock = Number(currentProd.stock_quantity || 0);
+            const newStock = Math.max(currentStock - qtySold, 0);
+
+            await supabase
+              .from('products')
+              .update({ stock_quantity: newStock })
+              .eq('id', prodId);
+          }
+        }
+      }
+
+      // 3. Update Buyer Balance (if due exists and buyer assigned)
+      if (buyerId && due > 0) {
+        const { data: currentBuyer } = await supabase
+          .from('buyers')
+          .select('current_balance')
+          .eq('id', buyerId)
+          .single();
+
+        if (currentBuyer) {
+          const updatedBalance = Number(currentBuyer.current_balance || 0) + due;
+          await supabase
+            .from('buyers')
+            .update({ current_balance: updatedBalance })
+            .eq('id', buyerId);
+        }
       }
 
       return resInvoice;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sales'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['buyers'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
@@ -445,6 +495,75 @@ export function useHealthCheck(_options?: any) {
       const { error } = await supabase.from('buyers').select('id').limit(1);
       if (error) throw error;
       return { status: 'ok' };
+    },
+  });
+}
+export function useCreatePurchase() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ data }: { data: any }) => {
+      const supplierId = data.supplierId || data.supplier_id;
+      const total = Number(data.totalAmount ?? data.total_amount ?? 0);
+      const paid = Number(data.paidAmount ?? data.paid_amount ?? 0);
+      const due = total - paid;
+
+      // 1. Insert Purchase Record
+      const { data: purchase, error: purchaseError } = await supabase.from('purchases').insert([{
+        supplier_id: supplierId,
+        total_amount: total,
+        paid_amount: paid,
+        due_amount: due,
+        notes: data.notes || null
+      }]).select().single();
+
+      if (purchaseError) throw purchaseError;
+
+      // 2. Increment Stock Levels
+      if (data.items && data.items.length > 0) {
+        for (const item of data.items) {
+          const prodId = item.productId || item.product_id;
+          const qtyPurchased = Number(item.quantity || item.qty || 1);
+
+          const { data: currentProd } = await supabase
+            .from('products')
+            .select('stock_quantity')
+            .eq('id', prodId)
+            .single();
+
+          if (currentProd) {
+            const newStock = Number(currentProd.stock_quantity || 0) + qtyPurchased;
+            await supabase
+              .from('products')
+              .update({ stock_quantity: newStock })
+              .eq('id', prodId);
+          }
+        }
+      }
+
+      // 3. Update Supplier Balance
+      if (supplierId && due > 0) {
+        const { data: currentSupplier } = await supabase
+          .from('suppliers')
+          .select('current_balance')
+          .eq('id', supplierId)
+          .single();
+
+        if (currentSupplier) {
+          const updatedBalance = Number(currentSupplier.current_balance || 0) + due;
+          await supabase
+            .from('suppliers')
+            .update({ current_balance: updatedBalance })
+            .eq('id', supplierId);
+        }
+      }
+
+      return purchase;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchases'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['suppliers'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
