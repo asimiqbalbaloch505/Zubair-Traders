@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { 
   ShoppingCart, Users, Package, Truck, Wallet, 
   HandCoins, BarChart2, LayoutDashboard, Loader2, AlertCircle, Inbox, X,
-  TrendingUp, TrendingDown
+  TrendingUp, TrendingDown, FileText
 } from 'lucide-react';
 
 import { Sales } from './pages/Sales';
@@ -13,6 +13,7 @@ import { Suppliers } from './pages/Suppliers';
 import { Expenses } from './pages/Expenses';
 import { Loans } from './pages/Loans';
 import { Reports } from './pages/Reports';
+import { Invoices } from './pages/Invoices';
 import { useGetDashboard } from './hooks/useSupabaseData';
 
 const queryClient = new QueryClient({
@@ -161,7 +162,6 @@ function DashboardOverview({ money, navigate }: any) {
 
   return (
     <div className="space-y-6 animate-in">
-      {/* Header & Clean Filter Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <PageIntro 
           eyebrow="Operations summary" 
@@ -195,7 +195,6 @@ function DashboardOverview({ money, navigate }: any) {
         </div>
       </div>
 
-      {/* Professional Monochrome Metrics Grid (Color ONLY for Net Profit / Loss) */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="panel cursor-pointer rounded-xl p-4 border border-border/80 transition hover:border-foreground/40" onClick={() => navigate('sales')}>
           <div className="flex items-center justify-between">
@@ -229,7 +228,6 @@ function DashboardOverview({ money, navigate }: any) {
           <div className="mt-2 font-mono text-2xl font-bold text-foreground">{money(data.totalExpenses || 0)}</div>
         </div>
 
-        {/* Dynamic Profit / Loss Metric */}
         <div className={`panel rounded-xl p-4 transition border ${isProfitable ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-red-500/5 border-red-500/30'}`}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-muted-foreground">
@@ -247,7 +245,6 @@ function DashboardOverview({ money, navigate }: any) {
         </div>
       </div>
 
-      {/* Clean 7-Day Sales Chart */}
       <div className="panel rounded-xl p-5 border border-border/80">
         <div className="flex items-center justify-between">
           <div>
@@ -289,13 +286,15 @@ function DashboardOverview({ money, navigate }: any) {
         </div>
       </div>
 
-      {/* Quick Actions Panel */}
       <div className="panel rounded-xl p-5 border border-border/80">
         <h3 className="font-bold text-foreground">Quick Actions</h3>
         <p className="mb-4 text-xs text-muted-foreground">Jump directly to common tasks</p>
         <div className="flex flex-wrap gap-3">
           <Button onClick={() => navigate('sales')} testId="nav-action-new-sale">
             <ShoppingCart size={16} /> New Sale Invoice
+          </Button>
+          <Button variant="outline" onClick={() => navigate('invoices')}>
+            <FileText size={16} /> All Invoices
           </Button>
           <Button variant="outline" onClick={() => navigate('buyers')} testId="nav-action-add-buyer">
             <Users size={16} /> Manage Buyers
@@ -315,6 +314,7 @@ function MainApp() {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'sales', label: 'Sales', icon: ShoppingCart },
+    { id: 'invoices', label: 'Invoices', icon: FileText },
     { id: 'buyers', label: 'Buyers', icon: Users },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
@@ -396,6 +396,7 @@ function MainApp() {
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         {activeTab === 'dashboard' && <DashboardOverview money={money} navigate={setActiveTab} />}
         {activeTab === 'sales' && <Sales {...commonProps} />}
+        {activeTab === 'invoices' && <Invoices {...commonProps} />}
         {activeTab === 'buyers' && <Buyers {...commonProps} />}
         {activeTab === 'products' && <Products {...commonProps} />}
         {activeTab === 'suppliers' && <Suppliers {...commonProps} />}

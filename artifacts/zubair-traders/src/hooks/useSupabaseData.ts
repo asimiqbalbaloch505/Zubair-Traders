@@ -28,56 +28,40 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
         const d = new Date(dateString);
         
         if (filter === 'all_time') return true;
-        
-        if (filter === 'today') {
-          return d.toDateString() === now.toDateString();
-        }
-        
+        if (filter === 'today') return d.toDateString() === now.toDateString();
         if (filter === 'this_week') {
           const sevenDaysAgo = new Date();
           sevenDaysAgo.setDate(now.getDate() - 7);
           return d >= sevenDaysAgo && d <= now;
         }
-
         if (filter === 'this_month') {
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         }
-
         if (filter === 'last_month') {
           const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
           return d.getMonth() === lastMonth.getMonth() && d.getFullYear() === lastMonth.getFullYear();
         }
-
-        if (filter === 'this_year') {
-          return d.getFullYear() === now.getFullYear();
-        }
-
+        if (filter === 'this_year') return d.getFullYear() === now.getFullYear();
         if (filter === 'custom_month' && customMonth) {
           const [year, month] = customMonth.split('-').map(Number);
           return d.getFullYear() === year && (d.getMonth() + 1) === month;
         }
-
         return true;
       };
 
-      // Filter sales and expenses by selected period
       const filteredSales = sales?.filter(s => isWithinFilter(s.created_at || s.transaction_time)) || [];
       const filteredExpenses = expenses?.filter(e => isWithinFilter(e.expense_date || e.created_at)) || [];
 
-      // Calculate Sales, Expenses, and Net Profit
       const totalSales = filteredSales.reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0);
       const totalExpenses = filteredExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
       const netProfit = totalSales - totalExpenses;
 
-      // Period-filtered Buyer Receivables (unpaid due amounts from filtered sales)
       const totalBuyerReceivables = filter === 'all_time'
         ? (buyers?.reduce((acc, b) => acc + (Number(b.current_balance ?? b.currentBalance) || 0), 0) || 0)
         : filteredSales.reduce((acc, s) => acc + (Number(s.due_amount ?? s.dueAmount ?? ((s.total_amount || 0) - (s.paid_amount || 0))) || 0), 0);
 
-      // Supplier Payables
       const totalSupplierPayables = suppliers?.reduce((acc, s) => acc + (Number(s.current_balance ?? s.currentBalance) || 0), 0) || 0;
 
-      // 7-Day Sales Trend Bar Chart
       const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const salesTrend = Array.from({ length: 7 }).map((_, i) => {
         const d = new Date();
@@ -93,11 +77,7 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
           })
           .reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0);
 
-        return {
-          day: dayLabel,
-          date: dateString,
-          value: dayTotal,
-        };
+        return { day: dayLabel, date: dateString, value: dayTotal };
       });
 
       return {
@@ -111,6 +91,7 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
     },
   });
 }
+
 export function useGetBuyers(_options?: any) {
   return useQuery({
     queryKey: ['buyers'],
@@ -170,14 +151,26 @@ export function useGetSales(_options?: any) {
   return useQuery({
     queryKey: ['sales'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('sales_invoices').select('*, buyers(name)');
+      const { data, error } = await supabase
+        .from('sales_invoices')
+        .select('*, buyers(name), sales_items(*, products(name))');
+        
       if (error) throw error;
+
       return (data || []).map(s => {
         let mappedStatus = 'unpaid';
         if (s.payment_status === 'PAID') mappedStatus = 'paid';
         else if (s.payment_status === 'PARTIALLY_PAID') mappedStatus = 'partial';
         else if (s.payment_status === 'DUE') mappedStatus = 'unpaid';
         else if (s.payment_status) mappedStatus = String(s.payment_status).toLowerCase();
+
+        const mappedItems = (s.sales_items || []).map((item: any) => ({
+          productId: item.product_id,
+          productName: item.products?.name || item.product_name || 'Item',
+          quantity: item.quantity,
+          unitPrice: item.unit_price,
+          totalPrice: item.total_price || item.unit_price * item.quantity,
+        }));
 
         return {
           id: s.id,
@@ -188,6 +181,8 @@ export function useGetSales(_options?: any) {
           dueAmount: s.due_amount ?? ((s.total_amount || 0) - (s.paid_amount || 0)),
           paymentStatus: mappedStatus,
           transactionTime: s.transaction_time || s.created_at,
+          notes: s.notes,
+          items: mappedItems.length > 0 ? mappedItems : s.items || [],
         };
       });
     },
@@ -212,17 +207,31 @@ export function useCreateSale() {
       const total = Number(data.totalAmount ?? data.total_amount ?? 0);
       const paid = Number(data.paidAmount ?? data.paid_amount ?? 0);
 
-      const { data: res, error } = await supabase.from('sales_invoices').insert([{
+      const { data: resInvoice, error: invError } = await supabase.from('sales_invoices').insert([{
         buyer_id: data.buyerId || data.buyer_id,
         total_amount: total,
         paid_amount: paid,
         due_amount: total - paid,
         payment_status: dbStatus,
         notes: data.notes || null,
-      }]).select();
+      }]).select().single();
 
-      if (error) throw error;
-      return res;
+      if (invError) throw invError;
+
+      if (data.items && data.items.length > 0) {
+        const lineItems = data.items.map((item: any) => ({
+          sales_invoice_id: resInvoice.id,
+          product_id: item.productId,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          total_price: item.totalPrice,
+        }));
+
+        const { error: itemsError } = await supabase.from('sales_items').insert(lineItems);
+        if (itemsError) console.warn('Item insertion skipped/failed:', itemsError.message);
+      }
+
+      return resInvoice;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sales'] });
