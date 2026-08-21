@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { 
   ShoppingCart, Users, Package, Truck, Wallet, 
-  HandCoins, BarChart2, LayoutDashboard, Loader2, AlertCircle, Inbox, X 
+  HandCoins, BarChart2, LayoutDashboard, Loader2, AlertCircle, Inbox, X,
+  TrendingUp, TrendingDown
 } from 'lucide-react';
 
 import { Sales } from './pages/Sales';
@@ -150,33 +151,112 @@ function DashboardOverview({ money, navigate }: any) {
   if (dash.isError) return <Failed onRetry={() => dash.refetch()} />;
 
   const data = dash.data || {};
+  const netProfit = Number(data.netProfit || 0);
+  const isProfitable = netProfit >= 0;
+  const trend = data.salesTrend || [];
+  const maxTrendValue = Math.max(...trend.map((p: any) => p.value), 1000);
 
   return (
     <div className="space-y-6 animate-in">
       <PageIntro eyebrow="Operations summary" title="Dashboard" detail="Zubair Traders cash position, sales volume, and quick actions." />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 5-Metric Executive Overview Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="panel cursor-pointer rounded-xl p-4 transition hover:border-primary/50" onClick={() => navigate('sales')}>
-          <div className="text-xs font-bold uppercase text-muted-foreground">Total Invoiced</div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-muted-foreground">Total Sales</span>
+            <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+          </div>
           <div className="mt-2 font-mono text-2xl font-bold">{money(data.totalSales || 0)}</div>
         </div>
 
         <div className="panel cursor-pointer rounded-xl p-4 transition hover:border-primary/50" onClick={() => navigate('buyers')}>
-          <div className="text-xs font-bold uppercase text-muted-foreground">Buyer Receivables</div>
-          <div className="mt-2 font-mono text-2xl font-bold text-accent">{money(data.totalBuyerReceivables || 0)}</div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-muted-foreground">Buyer Receivables</span>
+            <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+          </div>
+          <div className="mt-2 font-mono text-2xl font-bold text-amber-600">{money(data.totalBuyerReceivables || 0)}</div>
         </div>
 
         <div className="panel cursor-pointer rounded-xl p-4 transition hover:border-primary/50" onClick={() => navigate('suppliers')}>
-          <div className="text-xs font-bold uppercase text-muted-foreground">Supplier Payables</div>
-          <div className="mt-2 font-mono text-2xl font-bold text-amber-600">{money(data.totalSupplierPayables || 0)}</div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-muted-foreground">Supplier Payables</span>
+            <span className="h-2 w-2 rounded-full bg-purple-500"></span>
+          </div>
+          <div className="mt-2 font-mono text-2xl font-bold text-purple-600">{money(data.totalSupplierPayables || 0)}</div>
         </div>
 
         <div className="panel cursor-pointer rounded-xl p-4 transition hover:border-primary/50" onClick={() => navigate('expenses')}>
-          <div className="text-xs font-bold uppercase text-muted-foreground">Expenses Logged</div>
-          <div className="mt-2 font-mono text-2xl font-bold text-destructive">{money(data.totalExpenses || 0)}</div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-muted-foreground">Expenses Logged</span>
+            <span className="h-2 w-2 rounded-full bg-orange-500"></span>
+          </div>
+          <div className="mt-2 font-mono text-2xl font-bold text-orange-600">{money(data.totalExpenses || 0)}</div>
+        </div>
+
+        {/* Dynamic Profit / Loss Metric */}
+        <div className={`panel rounded-xl p-4 transition border ${isProfitable ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-red-500/5 border-red-500/30'}`}>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-muted-foreground">
+              {isProfitable ? 'Net Profit' : 'Net Loss'}
+            </span>
+            {isProfitable ? (
+              <TrendingUp size={18} className="text-emerald-600" />
+            ) : (
+              <TrendingDown size={18} className="text-red-600" />
+            )}
+          </div>
+          <div className={`mt-2 font-mono text-2xl font-bold ${isProfitable ? 'text-emerald-600' : 'text-red-600'}`}>
+            {isProfitable ? `+${money(netProfit)}` : `-${money(Math.abs(netProfit))}`}
+          </div>
         </div>
       </div>
 
+      {/* Last 7 Days Sales Trend Graph */}
+      <div className="panel rounded-xl p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-bold">Weekly Sales Rhythm</h3>
+            <p className="mt-1 text-xs text-muted-foreground">Invoiced revenue over the last 7 days</p>
+          </div>
+          <div className="rounded-md bg-primary/10 px-2.5 py-1 font-mono text-[11px] font-bold text-primary">
+            LAST 7 DAYS
+          </div>
+        </div>
+
+        <div className="mt-8 flex h-52 items-end gap-2 sm:gap-4 border-b border-border/60 pb-2">
+          {trend.length ? (
+            trend.map((point: any) => {
+              const heightPercent = Math.max((point.value / maxTrendValue) * 100, 4);
+              return (
+                <div key={point.day} className="group flex min-w-0 flex-1 flex-col items-center gap-2">
+                  <div className="relative flex h-40 w-full items-end justify-center">
+                    {/* Hover Value Popup */}
+                    <div className="absolute -top-7 rounded bg-foreground px-2 py-1 font-mono text-[10px] text-background opacity-0 transition-all group-hover:opacity-100 z-10 shadow-lg pointer-events-none">
+                      {money(point.value)}
+                    </div>
+                    {/* Bar Visual */}
+                    <div 
+                      className="w-full max-w-[36px] rounded-t-md bg-primary/80 transition-all duration-300 group-hover:bg-primary" 
+                      style={{ height: `${heightPercent}%` }} 
+                    />
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="font-mono text-[11px] font-bold text-foreground">{point.day}</span>
+                    <span className="text-[9px] text-muted-foreground">{point.date}</span>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="w-full">
+              <Empty title="No weekly sales data available" detail="Create invoices to see your 7-day trend chart." />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Quick Actions Panel */}
       <div className="panel rounded-xl p-5">
         <h3 className="font-bold">Quick Actions</h3>
         <p className="mb-4 text-xs text-muted-foreground">Jump directly to common tasks</p>

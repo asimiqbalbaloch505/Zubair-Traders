@@ -7,10 +7,10 @@ export function useGetDashboard(_options?: any) {
     queryFn: async () => {
       const [
         { data: sales, error: errSales },
-        { data: products, error: errProducts },
-        { data: buyers, error: errBuyers },
-        { data: suppliers, error: errSuppliers },
-        { data: expenses, error: errExpenses }
+        { data: products },
+        { data: buyers },
+        { data: suppliers },
+        { data: expenses }
       ] = await Promise.all([
         supabase.from('sales_invoices').select('*'),
         supabase.from('products').select('*'),
@@ -19,46 +19,48 @@ export function useGetDashboard(_options?: any) {
         supabase.from('expenses').select('*'),
       ]);
 
-      if (errSales) console.error('Error fetching sales:', errSales);
-      if (errBuyers) console.error('Error fetching buyers:', errBuyers);
-      if (errSuppliers) console.error('Error fetching suppliers:', errSuppliers);
-      if (errExpenses) console.error('Error fetching expenses:', errExpenses);
+      if (errSales) console.error('Sales fetch error:', errSales);
 
-      // Sum totals checking both snake_case (DB default) and camelCase properties
+      // Calculations
       const totalSales = sales?.reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0) || 0;
       const totalBuyerReceivables = buyers?.reduce((acc, b) => acc + (Number(b.current_balance ?? b.currentBalance) || 0), 0) || 0;
       const totalSupplierPayables = suppliers?.reduce((acc, s) => acc + (Number(s.current_balance ?? s.currentBalance) || 0), 0) || 0;
       const totalExpenses = expenses?.reduce((acc, e) => acc + (Number(e.amount) || 0), 0) || 0;
 
-      const lowStock = products?.filter(p => (p.stock_quantity ?? p.stockQuantity ?? 0) <= (p.min_stock_alert ?? p.minStockAlert ?? 0)) || [];
+      // Net Profit = Total Sales - Total Expenses
+      const netProfit = totalSales - totalExpenses;
+
+      // Last 7 Days Calculation (Sunday - Saturday)
+      const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const salesTrend = Array.from({ length: 7 }).map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - i));
+        
+        const dayLabel = daysOfWeek[d.getDay()];
+        const dateString = `${d.getMonth() + 1}/${d.getDate()}`;
+        
+        // Sum matching day sales
+        const dayTotal = sales
+          ?.filter(s => {
+            const saleDate = new Date(s.created_at || s.transaction_time || Date.now());
+            return saleDate.toDateString() === d.toDateString();
+          })
+          .reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0) || 0;
+
+        return {
+          day: dayLabel,
+          date: dateString,
+          value: dayTotal,
+        };
+      });
 
       return {
-        // App.tsx keys
         totalSales,
         totalBuyerReceivables,
         totalSupplierPayables,
         totalExpenses,
-
-        // Dashboard.tsx keys
-        dailySales: totalSales,
-        todaysProfit: totalSales * 0.15,
-        buyerDebt: totalBuyerReceivables,
-        supplierOwed: totalSupplierPayables,
-        cashInDrawer: totalSales,
-        totalInvoiced: totalSales,
-        buyerReceivables: totalBuyerReceivables,
-        supplierPayables: totalSupplierPayables,
-        expensesLogged: totalExpenses,
-
-        salesTrend: [],
-        lowStock: lowStock.map(p => ({
-          id: p.id,
-          name: p.name,
-          unit: p.unit,
-          stockQuantity: p.stock_quantity ?? p.stockQuantity,
-          minStockAlert: p.min_stock_alert ?? p.minStockAlert,
-        })),
-        recentActivity: [],
+        netProfit,
+        salesTrend,
       };
     },
   });
