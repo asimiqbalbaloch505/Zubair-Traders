@@ -190,18 +190,24 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     setErrorMessage(null);
     setDone(false);
 
-    // Mapped explicitly to snake_case column names required by Supabase API
+    // Both camelCase and snake_case are included to support hook transformations or direct database calls
     const payload = {
+      buyerId: String(buyerId),
       buyer_id: String(buyerId),
+      totalAmount: totalAmount,
       total_amount: totalAmount,
+      paidAmount: paid,
       paid_amount: paid,
+      dueAmount: due,
       due_amount: due,
+      paymentStatus: due <= 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
       payment_status: due <= 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
       notes: notes || null,
+      items: items,
     };
 
     create.mutate(
-      { data: payload },
+      { data: payload as any },
       {
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getGetSalesQueryKey() });
@@ -214,7 +220,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
         },
         onError: (err: any) => {
           console.error('Supabase Sale Creation Error:', err);
-          setErrorMessage(err?.message || 'Failed to post sale. Check database table schema columns.');
+          setErrorMessage(err?.message || 'Failed to post sale. Please check your data.');
         },
       }
     );
@@ -310,12 +316,13 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
             </div>
 
             <div className="grid grid-cols-2 gap-3 items-start">
-              <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
-                Sale total
-                <div className="flex h-10 items-center rounded-lg border bg-muted/50 px-3 font-mono text-sm font-bold text-foreground">
-                  {money(totalAmount)}
-                </div>
-              </label>
+              <Field
+                label="Sale total"
+                name="sale-total"
+                value={money(totalAmount)}
+                readOnly
+                disabled
+              />
               
               <Field
                 label="Paid now"
