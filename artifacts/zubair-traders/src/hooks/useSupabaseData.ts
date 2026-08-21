@@ -18,7 +18,7 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
         supabase.from('buyers').select('*'),
         supabase.from('suppliers').select('*'),
         supabase.from('expenses').select('*'),
-        supabase.from('purchases').select('*'),
+        supabase.from('purchase_invoices').select('*'), // FIX 1: Changed 'purchases' to 'purchase_invoices'
       ]);
 
       if (errSales) console.error('Sales fetch error:', errSales);
@@ -53,7 +53,7 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
 
       const filteredSales = sales?.filter(s => isWithinFilter(s.created_at || s.transaction_time)) || [];
       const filteredExpenses = expenses?.filter(e => isWithinFilter(e.expense_date || e.created_at)) || [];
-      const filteredPurchases = purchases?.filter(p => isWithinFilter(p.created_at || p.transaction_time)) || [];
+      const filteredPurchases = purchases?.filter(p => isWithinFilter(p.transaction_time || p.created_at)) || [];
 
       const totalSales = filteredSales.reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0);
       const totalExpenses = filteredExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
@@ -96,7 +96,6 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
     },
   });
 }
-
 
 export function useGetBuyers(_options?: any) {
   return useQuery({
@@ -217,7 +216,6 @@ export function useGetSales() {
           transaction_time: s.transaction_time,
           notes: s.notes,
           
-          // Provide alias keys so modal components using legacy property names bind instantly
           items: mappedItems,
           sales_items: mappedItems,
           sale_items: mappedItems,
@@ -498,6 +496,7 @@ export function useHealthCheck(_options?: any) {
     },
   });
 }
+
 export function useCreatePurchase() {
   const qc = useQueryClient();
   return useMutation({
@@ -507,19 +506,30 @@ export function useCreatePurchase() {
       const paid = Number(data.paidAmount ?? data.paid_amount ?? 0);
       const due = total - paid;
 
-      // 1. Insert Purchase Record
-      const { data: purchase, error: purchaseError } = await supabase.from('purchases').insert([{
+      // FIX 2: Target 'purchase_invoices' instead of 'purchases'
+      const { data: purchase, error: purchaseError } = await supabase.from('purchase_invoices').insert([{
         supplier_id: supplierId,
         total_amount: total,
         paid_amount: paid,
         due_amount: due,
-        notes: data.notes || null
+        notes: data.notes || null,
+        transaction_time: new Date().toISOString(),
       }]).select().single();
 
       if (purchaseError) throw purchaseError;
 
-      // 2. Increment Stock Levels
       if (data.items && data.items.length > 0) {
+        // FIX 3: Target 'purchase_invoice_items' table
+        const lineItems = data.items.map((item: any) => ({
+          purchase_id: purchase.id,
+          product_id: item.productId || item.product_id,
+          quantity: Number(item.quantity || item.qty || 1),
+          purchase_cost: Number(item.unitCost || item.purchase_cost || 0),
+          subtotal: Number(item.subtotal || item.totalPrice || 0)
+        }));
+
+        await supabase.from('purchase_invoice_items').insert(lineItems);
+
         for (const item of data.items) {
           const prodId = item.productId || item.product_id;
           const qtyPurchased = Number(item.quantity || item.qty || 1);
@@ -540,7 +550,6 @@ export function useCreatePurchase() {
         }
       }
 
-      // 3. Update Supplier Balance
       if (supplierId && due > 0) {
         const { data: currentSupplier } = await supabase
           .from('suppliers')
