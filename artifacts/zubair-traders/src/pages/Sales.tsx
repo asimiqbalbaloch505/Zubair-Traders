@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Plus, Check, X, Printer, FileText, ShoppingCart
+  Plus, Check, X, Printer, FileText, ShoppingCart, AlertCircle
 } from 'lucide-react';
 import { 
   useGetSales, getGetSalesQueryKey, 
@@ -26,6 +26,7 @@ export interface SalesInvoice {
   buyerId?: number | string;
   buyer_id?: number | string;
   buyerName?: string;
+  buyer_name?: string;
   totalAmount?: number;
   total_amount?: number;
   paidAmount?: number;
@@ -52,7 +53,7 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
   const cleanInvoiceNo = String(rawInv).replace(/^INV-?/i, '');
   const total = sale.total_amount ?? sale.totalAmount ?? 0;
   const paid = sale.paid_amount ?? sale.paidAmount ?? 0;
-  const due = sale.due_amount ?? sale.dueAmount ?? (total - paid);
+  const due = sale.due_amount ?? sale.dueAmount ?? Math.max(total - paid, 0);
 
   return (
     <Modal title={`Invoice #${cleanInvoiceNo}`} eyebrow="Sales Receipt Detail" onClose={onClose}>
@@ -161,19 +162,46 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     const prod = products.data?.find((p: any) => String(p.id) === String(selectedProductId));
     if (!prod) return;
 
-    const qty = Math.max(Number(itemQty) || 1, 1);
+    const requestedQty = Math.max(Number(itemQty) || 1, 1);
+    const availableStock = prod.stock ?? prod.quantity ?? prod.stock_quantity ?? Infinity;
+
+    // Check existing qty already in cart
+    const existingCartItem = items.find(i => String(i.productId) === String(prod.id));
+    const currentCartQty = existingCartItem ? existingCartItem.quantity : 0;
+
+    if (currentCartQty + requestedQty > availableStock) {
+      setErrorMessage(`Cannot add line item. Total requested (${currentCartQty + requestedQty}) exceeds available stock (${availableStock}).`);
+      return;
+    }
+
+    setErrorMessage(null);
     const unitPrice = Number(prod.salePrice || prod.sellingPrice || prod.price || prod.sale_price || 0);
 
-    setItems(prev => [
-      ...prev,
-      {
-        productId: prod.id,
-        productName: prod.name,
-        quantity: qty,
-        unitPrice,
-        totalPrice: unitPrice * qty,
-      },
-    ]);
+    setItems(prev => {
+      if (existingCartItem) {
+        return prev.map(item => {
+          if (String(item.productId) === String(prod.id)) {
+            const newQty = item.quantity + requestedQty;
+            return {
+              ...item,
+              quantity: newQty,
+              totalPrice: newQty * item.unitPrice,
+            };
+          }
+          return item;
+        });
+      }
+      return [
+        ...prev,
+        {
+          productId: prod.id,
+          productName: prod.name,
+          quantity: requestedQty,
+          unitPrice,
+          totalPrice: unitPrice * requestedQty,
+        },
+      ];
+    });
 
     setSelectedProductId('');
     setItemQty('1');
@@ -212,6 +240,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
       {
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getGetSalesQueryKey() });
+          qc.invalidateQueries({ queryKey: getGetProductsQueryKey() });
           qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
           setDone(true);
           setBuyerId('');
@@ -271,11 +300,15 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                   className="h-10 flex-1 rounded-lg border border-input bg-background px-3 text-sm font-medium outline-none focus:border-primary"
                 >
                   <option value="">Select product...</option>
-                  {products.data?.map((p: any) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({money(p.salePrice || p.sellingPrice || p.price || p.sale_price)})
-                    </option>
-                  ))}
+                  {products.data?.map((p: any) => {
+                    const availableStock = p.stock ?? p.quantity ?? p.stock_quantity;
+                    const stockLabel = availableStock !== undefined ? ` | Stock: ${availableStock}` : '';
+                    return (
+                      <option key={p.id} value={p.id} disabled={availableStock <= 0}>
+                        {p.name} ({money(p.salePrice || p.sellingPrice || p.price || p.sale_price)}){stockLabel}
+                      </option>
+                    );
+                  })}
                 </select>
                 <input
                   type="number"
@@ -367,8 +400,9 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
             )}
 
             {errorMessage && (
-              <div className="rounded bg-destructive/10 p-2.5 text-xs font-semibold text-destructive">
-                {errorMessage}
+              <div className="flex items-center gap-2 rounded bg-destructive/10 p-2.5 text-xs font-semibold text-destructive">
+                <AlertCircle size={15} />
+                <span>{errorMessage}</span>
               </div>
             )}
           </form>
@@ -431,7 +465,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                           <span
                             data-testid={`status-sale-${s.id}`}
                             className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${
-                              status === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-secondary text-primary'
+                              String(status).toLowerCase() === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-secondary text-primary'
                             }`}
                           >
                             {status}
