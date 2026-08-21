@@ -151,7 +151,6 @@ export function useGetSales() {
   return useQuery({
     queryKey: ['sales'],
     queryFn: async () => {
-      // Must use `supabase` instance, NOT standard fetch()
       const { data, error } = await supabase
         .from('sales_invoices')
         .select(`
@@ -162,7 +161,7 @@ export function useGetSales() {
             products(name)
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('transaction_time', { ascending: false }); // <-- Fixed column name here!
 
       if (error) {
         console.error("Sales query error:", error);
@@ -177,7 +176,7 @@ export function useGetSales() {
         paidAmount: s.paid_amount,
         dueAmount: s.due_amount ?? ((s.total_amount || 0) - (s.paid_amount || 0)),
         paymentStatus: s.payment_status ? String(s.payment_status).toLowerCase() : 'unpaid',
-        transactionTime: s.transaction_time || s.created_at,
+        transactionTime: s.transaction_time,
         notes: s.notes,
         items: (s.sales_invoice_items || []).map((item: any) => ({
           id: item.id,
