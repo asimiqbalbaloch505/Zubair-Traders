@@ -13,7 +13,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 
 export interface SaleItemInput {
-  productId: number;
+  productId: number | string;
   productName: string;
   quantity: number;
   unitPrice: number;
@@ -21,9 +21,9 @@ export interface SaleItemInput {
 }
 
 export interface SalesInvoice {
-  id: number;
+  id: number | string;
   invoiceNumber: string | number;
-  buyerId: number;
+  buyerId: number | string;
   buyerName?: string;
   totalAmount: number;
   paidAmount: number;
@@ -47,7 +47,7 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
 
   return (
     <Modal title={`Invoice #${cleanInvoiceNo}`} eyebrow="Sales Receipt Detail" onClose={onClose}>
-      <div className="space-y-4 text-sm">
+      <div className="space-y-4 text-sm printable-invoice">
         <div className="flex justify-between border-b pb-3 text-xs text-muted-foreground">
           <div>
             <span className="font-semibold text-foreground">Buyer:</span> {sale.buyerName || 'Walk-in Buyer'}
@@ -58,7 +58,7 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
         </div>
 
         {sale.items && sale.items.length > 0 ? (
-          <div className="max-h-48 overflow-y-auto border-y py-2">
+          <div className="max-h-56 overflow-y-auto border-y py-2">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b text-muted-foreground">
@@ -107,7 +107,7 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
           </div>
         )}
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex justify-end gap-2 pt-2 print:hidden">
           <Button variant="outline" testId="button-modal-print" onClick={() => window.print()}>
             <Printer size={15} /> Print
           </Button>
@@ -148,11 +148,11 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
 
   const addItem = () => {
     if (!selectedProductId) return;
-    const prod = products.data?.find((p: any) => p.id === Number(selectedProductId));
+    const prod = products.data?.find((p: any) => String(p.id) === String(selectedProductId));
     if (!prod) return;
 
     const qty = Math.max(Number(itemQty) || 1, 1);
-    const unitPrice = prod.salePrice || prod.sellingPrice || 0;
+    const unitPrice = Number(prod.salePrice || prod.sellingPrice || prod.price || 0);
 
     setItems(prev => [
       ...prev,
@@ -182,7 +182,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     create.mutate(
       {
         data: {
-          buyerId: Number(buyerId),
+          buyerId: String(buyerId),
           invoiceNumber: rawInvoiceNum,
           totalAmount,
           paidAmount: paid,
@@ -251,7 +251,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                   <option value="">Select product...</option>
                   {products.data?.map((p: any) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({money(p.salePrice || p.sellingPrice)})
+                      {p.name} ({money(p.salePrice || p.sellingPrice || p.price)})
                     </option>
                   ))}
                 </select>
@@ -294,13 +294,14 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Sale total</label>
-                <div className="mt-1 flex h-10 items-center rounded-lg border bg-muted/50 px-3 font-mono text-sm font-bold">
+            <div className="grid grid-cols-2 gap-3 items-start">
+              <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+                Sale total
+                <div className="flex h-10 items-center rounded-lg border bg-muted/50 px-3 font-mono text-sm font-bold text-foreground">
                   {money(totalAmount)}
                 </div>
-              </div>
+              </label>
+              
               <Field
                 label="Paid now"
                 name="paid-amount"
