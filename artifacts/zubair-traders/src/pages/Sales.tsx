@@ -32,8 +32,8 @@ export interface SalesInvoice {
   paid_amount?: number;
   dueAmount?: number;
   due_amount?: number;
-  paymentStatus?: 'paid' | 'partial' | 'unpaid';
-  payment_status?: 'paid' | 'partial' | 'unpaid';
+  paymentStatus?: 'paid' | 'partial' | 'unpaid' | 'PAID' | 'PARTIALLY_PAID' | 'DUE';
+  payment_status?: 'paid' | 'partial' | 'unpaid' | 'PAID' | 'PARTIALLY_PAID' | 'DUE';
   transactionTime?: string;
   created_at?: string;
   notes?: string;
@@ -190,7 +190,8 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     setErrorMessage(null);
     setDone(false);
 
-    // Both camelCase and snake_case are included to support hook transformations or direct database calls
+    const dbPaymentStatus = due <= 0 ? 'PAID' : paid > 0 ? 'PARTIALLY_PAID' : 'DUE';
+
     const payload = {
       buyerId: String(buyerId),
       buyer_id: String(buyerId),
@@ -200,8 +201,8 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
       paid_amount: paid,
       dueAmount: due,
       due_amount: due,
-      paymentStatus: due <= 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
-      payment_status: due <= 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
+      paymentStatus: dbPaymentStatus,
+      payment_status: dbPaymentStatus,
       notes: notes || null,
       items: items,
     };

@@ -98,16 +98,24 @@ export function useGetSales(_options?: any) {
     queryFn: async () => {
       const { data, error } = await supabase.from('sales_invoices').select('*, buyers(name)');
       if (error) throw error;
-      return (data || []).map(s => ({
-        id: s.id,
-        invoiceNumber: s.invoice_number ? `INV-${s.invoice_number}` : `INV-${s.id}`,
-        buyerName: s.buyers?.name || 'Walk-in',
-        totalAmount: s.total_amount,
-        paidAmount: s.paid_amount,
-        dueAmount: s.due_amount ?? ((s.total_amount || 0) - (s.paid_amount || 0)),
-        paymentStatus: s.payment_status,
-        transactionTime: s.transaction_time || s.created_at,
-      }));
+      return (data || []).map(s => {
+        let mappedStatus = 'unpaid';
+        if (s.payment_status === 'PAID') mappedStatus = 'paid';
+        else if (s.payment_status === 'PARTIALLY_PAID') mappedStatus = 'partial';
+        else if (s.payment_status === 'DUE') mappedStatus = 'unpaid';
+        else if (s.payment_status) mappedStatus = String(s.payment_status).toLowerCase();
+
+        return {
+          id: s.id,
+          invoiceNumber: s.invoice_number ? `INV-${s.invoice_number}` : `INV-${s.id}`,
+          buyerName: s.buyers?.name || 'Walk-in',
+          totalAmount: s.total_amount,
+          paidAmount: s.paid_amount,
+          dueAmount: s.due_amount ?? ((s.total_amount || 0) - (s.paid_amount || 0)),
+          paymentStatus: mappedStatus,
+          transactionTime: s.transaction_time || s.created_at,
+        };
+      });
     },
   });
 }
@@ -116,14 +124,29 @@ export function useCreateSale() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ data }: { data: any }) => {
+      let dbStatus = 'DUE';
+      const rawStatus = String(data.paymentStatus || data.payment_status || '').toUpperCase();
+      
+      if (rawStatus === 'PAID') {
+        dbStatus = 'PAID';
+      } else if (rawStatus === 'PARTIAL' || rawStatus === 'PARTIALLY_PAID') {
+        dbStatus = 'PARTIALLY_PAID';
+      } else if (rawStatus === 'UNPAID' || rawStatus === 'DUE') {
+        dbStatus = 'DUE';
+      }
+
+      const total = Number(data.totalAmount ?? data.total_amount ?? 0);
+      const paid = Number(data.paidAmount ?? data.paid_amount ?? 0);
+
       const { data: res, error } = await supabase.from('sales_invoices').insert([{
-        buyer_id: data.buyerId,
-        total_amount: data.totalAmount,
-        paid_amount: data.paidAmount,
-        due_amount: data.totalAmount - data.paidAmount,
-        payment_status: data.paymentStatus,
-        notes: data.notes,
+        buyer_id: data.buyerId || data.buyer_id,
+        total_amount: total,
+        paid_amount: paid,
+        due_amount: total - paid,
+        payment_status: dbStatus,
+        notes: data.notes || null,
       }]).select();
+
       if (error) throw error;
       return res;
     },
