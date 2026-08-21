@@ -13,7 +13,7 @@ import { Suppliers } from './pages/Suppliers';
 import { Expenses } from './pages/Expenses';
 import { Loans } from './pages/Loans';
 import { Reports } from './pages/Reports';
-import { useGetDashboard, getGetDashboardQueryKey } from './hooks/useSupabaseData';
+import { useGetDashboard } from './hooks/useSupabaseData';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -161,7 +161,7 @@ function DashboardOverview({ money, navigate }: any) {
 
   return (
     <div className="space-y-6 animate-in">
-      {/* Header & Date Filter Selector */}
+      {/* Header & Clean Filter Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <PageIntro 
           eyebrow="Operations summary" 
@@ -173,7 +173,7 @@ function DashboardOverview({ money, navigate }: any) {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="h-10 rounded-lg border border-input bg-background px-3 text-xs font-semibold text-foreground outline-none focus:border-primary shadow-xs"
+            className="h-10 rounded-lg border border-input bg-background px-3 text-xs font-semibold text-foreground outline-none focus:border-foreground shadow-xs"
           >
             <option value="this_month">This Month</option>
             <option value="today">Today</option>
@@ -189,44 +189,44 @@ function DashboardOverview({ money, navigate }: any) {
               type="month"
               value={customMonth}
               onChange={(e) => setCustomMonth(e.target.value)}
-              className="h-10 rounded-lg border border-input bg-background px-3 text-xs font-medium text-foreground outline-none focus:border-primary"
+              className="h-10 rounded-lg border border-input bg-background px-3 text-xs font-medium text-foreground outline-none focus:border-foreground"
             />
           )}
         </div>
       </div>
 
-      {/* 5-Metric Executive Overview Grid */}
+      {/* Professional Monochrome Metrics Grid (Color ONLY for Net Profit / Loss) */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="panel cursor-pointer rounded-xl p-4 transition hover:border-primary/50" onClick={() => navigate('sales')}>
+        <div className="panel cursor-pointer rounded-xl p-4 border border-border/80 transition hover:border-foreground/40" onClick={() => navigate('sales')}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-muted-foreground">Total Sales</span>
-            <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+            <span className="h-2 w-2 rounded-full bg-foreground"></span>
           </div>
-          <div className="mt-2 font-mono text-2xl font-bold">{money(data.totalSales || 0)}</div>
+          <div className="mt-2 font-mono text-2xl font-bold text-foreground">{money(data.totalSales || 0)}</div>
         </div>
 
-        <div className="panel cursor-pointer rounded-xl p-4 transition hover:border-primary/50" onClick={() => navigate('buyers')}>
+        <div className="panel cursor-pointer rounded-xl p-4 border border-border/80 transition hover:border-foreground/40" onClick={() => navigate('buyers')}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-muted-foreground">Buyer Receivables</span>
-            <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+            <span className="h-2 w-2 rounded-full bg-foreground"></span>
           </div>
-          <div className="mt-2 font-mono text-2xl font-bold text-amber-600">{money(data.totalBuyerReceivables || 0)}</div>
+          <div className="mt-2 font-mono text-2xl font-bold text-foreground">{money(data.totalBuyerReceivables || 0)}</div>
         </div>
 
-        <div className="panel cursor-pointer rounded-xl p-4 transition hover:border-primary/50" onClick={() => navigate('suppliers')}>
+        <div className="panel cursor-pointer rounded-xl p-4 border border-border/80 transition hover:border-foreground/40" onClick={() => navigate('suppliers')}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-muted-foreground">Supplier Payables</span>
-            <span className="h-2 w-2 rounded-full bg-purple-500"></span>
+            <span className="h-2 w-2 rounded-full bg-foreground"></span>
           </div>
-          <div className="mt-2 font-mono text-2xl font-bold text-purple-600">{money(data.totalSupplierPayables || 0)}</div>
+          <div className="mt-2 font-mono text-2xl font-bold text-foreground">{money(data.totalSupplierPayables || 0)}</div>
         </div>
 
-        <div className="panel cursor-pointer rounded-xl p-4 transition hover:border-primary/50" onClick={() => navigate('expenses')}>
+        <div className="panel cursor-pointer rounded-xl p-4 border border-border/80 transition hover:border-foreground/40" onClick={() => navigate('expenses')}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-muted-foreground">Expenses Logged</span>
-            <span className="h-2 w-2 rounded-full bg-orange-500"></span>
+            <span className="h-2 w-2 rounded-full bg-foreground"></span>
           </div>
-          <div className="mt-2 font-mono text-2xl font-bold text-orange-600">{money(data.totalExpenses || 0)}</div>
+          <div className="mt-2 font-mono text-2xl font-bold text-foreground">{money(data.totalExpenses || 0)}</div>
         </div>
 
         {/* Dynamic Profit / Loss Metric */}
@@ -247,14 +247,14 @@ function DashboardOverview({ money, navigate }: any) {
         </div>
       </div>
 
-      {/* Weekly Sales Rhythm Bar Chart */}
-      <div className="panel rounded-xl p-5">
+      {/* Clean 7-Day Sales Chart */}
+      <div className="panel rounded-xl p-5 border border-border/80">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-bold">Weekly Sales Rhythm</h3>
+            <h3 className="font-bold text-foreground">Weekly Sales Rhythm</h3>
             <p className="mt-1 text-xs text-muted-foreground">Invoiced revenue over the last 7 days</p>
           </div>
-          <div className="rounded-md bg-primary/10 px-2.5 py-1 font-mono text-[11px] font-bold text-primary">
+          <div className="rounded-md bg-muted px-2 py-1 font-mono text-[10px] font-bold text-foreground">
             LAST 7 DAYS
           </div>
         </div>
@@ -270,7 +270,7 @@ function DashboardOverview({ money, navigate }: any) {
                       {money(point.value)}
                     </div>
                     <div 
-                      className="w-full max-w-[36px] rounded-t-md bg-primary/80 transition-all duration-300 group-hover:bg-primary" 
+                      className="w-full max-w-[36px] rounded-t-md bg-foreground/80 transition-all duration-300 group-hover:bg-foreground" 
                       style={{ height: `${heightPercent}%` }} 
                     />
                   </div>
@@ -289,9 +289,9 @@ function DashboardOverview({ money, navigate }: any) {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="panel rounded-xl p-5">
-        <h3 className="font-bold">Quick Actions</h3>
+      {/* Quick Actions Panel */}
+      <div className="panel rounded-xl p-5 border border-border/80">
+        <h3 className="font-bold text-foreground">Quick Actions</h3>
         <p className="mb-4 text-xs text-muted-foreground">Jump directly to common tasks</p>
         <div className="flex flex-wrap gap-3">
           <Button onClick={() => navigate('sales')} testId="nav-action-new-sale">
