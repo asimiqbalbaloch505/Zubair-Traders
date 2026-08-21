@@ -6,11 +6,11 @@ export function useGetDashboard(_options?: any) {
     queryKey: ['dashboard'],
     queryFn: async () => {
       const [
-        { data: sales },
-        { data: products },
-        { data: buyers },
-        { data: suppliers },
-        { data: expenses }
+        { data: sales, error: errSales },
+        { data: products, error: errProducts },
+        { data: buyers, error: errBuyers },
+        { data: suppliers, error: errSuppliers },
+        { data: expenses, error: errExpenses }
       ] = await Promise.all([
         supabase.from('sales_invoices').select('*'),
         supabase.from('products').select('*'),
@@ -19,27 +19,36 @@ export function useGetDashboard(_options?: any) {
         supabase.from('expenses').select('*'),
       ]);
 
-      // Calculate totals handling both snake_case and camelCase field structures
-      const totalInvoiced = sales?.reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0) || 0;
-      const buyerDebt = buyers?.reduce((acc, b) => acc + (Number(b.current_balance ?? b.currentBalance) || 0), 0) || 0;
-      const supplierOwed = suppliers?.reduce((acc, s) => acc + (Number(s.current_balance ?? s.currentBalance) || 0), 0) || 0;
-      const expensesLogged = expenses?.reduce((acc, e) => acc + (Number(e.amount) || 0), 0) || 0;
+      if (errSales) console.error('Error fetching sales:', errSales);
+      if (errBuyers) console.error('Error fetching buyers:', errBuyers);
+      if (errSuppliers) console.error('Error fetching suppliers:', errSuppliers);
+      if (errExpenses) console.error('Error fetching expenses:', errExpenses);
+
+      // Sum totals checking both snake_case (DB default) and camelCase properties
+      const totalSales = sales?.reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0) || 0;
+      const totalBuyerReceivables = buyers?.reduce((acc, b) => acc + (Number(b.current_balance ?? b.currentBalance) || 0), 0) || 0;
+      const totalSupplierPayables = suppliers?.reduce((acc, s) => acc + (Number(s.current_balance ?? s.currentBalance) || 0), 0) || 0;
+      const totalExpenses = expenses?.reduce((acc, e) => acc + (Number(e.amount) || 0), 0) || 0;
 
       const lowStock = products?.filter(p => (p.stock_quantity ?? p.stockQuantity ?? 0) <= (p.min_stock_alert ?? p.minStockAlert ?? 0)) || [];
 
       return {
-        // Properties used in Dashboard.tsx
-        dailySales: totalInvoiced,
-        todaysProfit: totalInvoiced * 0.15,
-        buyerDebt,
-        supplierOwed,
-        cashInDrawer: totalInvoiced,
-        
-        // Properties used in the component variation shown in screenshot
-        totalInvoiced,
-        buyerReceivables: buyerDebt,
-        supplierPayables: supplierOwed,
-        expensesLogged,
+        // App.tsx keys
+        totalSales,
+        totalBuyerReceivables,
+        totalSupplierPayables,
+        totalExpenses,
+
+        // Dashboard.tsx keys
+        dailySales: totalSales,
+        todaysProfit: totalSales * 0.15,
+        buyerDebt: totalBuyerReceivables,
+        supplierOwed: totalSupplierPayables,
+        cashInDrawer: totalSales,
+        totalInvoiced: totalSales,
+        buyerReceivables: totalBuyerReceivables,
+        supplierPayables: totalSupplierPayables,
+        expensesLogged: totalExpenses,
 
         salesTrend: [],
         lowStock: lowStock.map(p => ({
