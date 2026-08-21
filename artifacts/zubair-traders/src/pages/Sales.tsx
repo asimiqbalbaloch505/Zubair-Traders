@@ -1,13 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Plus, Check, X, Printer, FileText, ShoppingCart, 
-  Search, Pencil, PackagePlus, AlertTriangle, BarChart3, ChevronRight 
+  Plus, Check, X, Printer, FileText, ShoppingCart
 } from 'lucide-react';
 import { 
   useGetSales, getGetSalesQueryKey, 
   useGetBuyers, getGetBuyersQueryKey, 
   useGetProducts, getGetProductsQueryKey, 
-  useGetDashboard, getGetDashboardQueryKey,
+  getGetDashboardQueryKey,
   useCreateSale 
 } from '../hooks/useSupabaseData';
 import { useQueryClient } from '@tanstack/react-query';
@@ -22,13 +21,19 @@ export interface SaleItemInput {
 
 export interface SalesInvoice {
   id: number | string;
-  invoiceNumber: string | number;
-  buyerId: number | string;
+  invoiceNumber?: string | number;
+  invoice_number?: string | number;
+  buyerId?: number | string;
+  buyer_id?: number | string;
   buyerName?: string;
-  totalAmount: number;
-  paidAmount: number;
-  dueAmount: number;
-  paymentStatus: 'paid' | 'partial' | 'unpaid';
+  totalAmount?: number;
+  total_amount?: number;
+  paidAmount?: number;
+  paid_amount?: number;
+  dueAmount?: number;
+  due_amount?: number;
+  paymentStatus?: 'paid' | 'partial' | 'unpaid';
+  payment_status?: 'paid' | 'partial' | 'unpaid';
   transactionTime?: string;
   created_at?: string;
   notes?: string;
@@ -43,14 +48,18 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
       })
     : 'N/A';
 
-  const cleanInvoiceNo = String(sale.invoiceNumber).replace(/^INV-?/i, '');
+  const rawInv = sale.invoice_number || sale.invoiceNumber || sale.id;
+  const cleanInvoiceNo = String(rawInv).replace(/^INV-?/i, '');
+  const total = sale.total_amount ?? sale.totalAmount ?? 0;
+  const paid = sale.paid_amount ?? sale.paidAmount ?? 0;
+  const due = sale.due_amount ?? sale.dueAmount ?? (total - paid);
 
   return (
     <Modal title={`Invoice #${cleanInvoiceNo}`} eyebrow="Sales Receipt Detail" onClose={onClose}>
       <div className="space-y-4 text-sm printable-invoice">
         <div className="flex justify-between border-b pb-3 text-xs text-muted-foreground">
           <div>
-            <span className="font-semibold text-foreground">Buyer:</span> {sale.buyerName || 'Walk-in Buyer'}
+            <span className="font-semibold text-foreground">Buyer:</span> {sale.buyerName || sale.buyer_name || 'Walk-in Buyer'}
           </div>
           <div>
             <span className="font-semibold text-foreground">Date & Time:</span> {formattedDate}
@@ -89,15 +98,15 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
         <div className="space-y-1.5 rounded-lg bg-muted/60 p-3 text-xs">
           <div className="flex justify-between">
             <span>Total Amount:</span>
-            <span className="font-mono font-bold">{money(sale.totalAmount)}</span>
+            <span className="font-mono font-bold">{money(total)}</span>
           </div>
           <div className="flex justify-between text-emerald-700">
             <span>Paid Amount:</span>
-            <span className="font-mono font-bold">{money(sale.paidAmount)}</span>
+            <span className="font-mono font-bold">{money(paid)}</span>
           </div>
           <div className="flex justify-between text-destructive">
             <span>Balance Due:</span>
-            <span className="font-mono font-bold">{money(sale.dueAmount)}</span>
+            <span className="font-mono font-bold">{money(due)}</span>
           </div>
         </div>
 
@@ -129,6 +138,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
   const qc = useQueryClient();
 
   const [done, setDone] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoice | null>(null);
 
   const [buyerId, setBuyerId] = useState('');
@@ -152,7 +162,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     if (!prod) return;
 
     const qty = Math.max(Number(itemQty) || 1, 1);
-    const unitPrice = Number(prod.salePrice || prod.sellingPrice || prod.price || 0);
+    const unitPrice = Number(prod.salePrice || prod.sellingPrice || prod.price || prod.sale_price || 0);
 
     setItems(prev => [
       ...prev,
@@ -177,20 +187,21 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     e.preventDefault();
     if (!buyerId || items.length === 0) return;
 
-    const rawInvoiceNum = (sales.data?.length || 0) + 1;
+    setErrorMessage(null);
+    setDone(false);
+
+    // Mapped explicitly to snake_case column names required by Supabase API
+    const payload = {
+      buyer_id: String(buyerId),
+      total_amount: totalAmount,
+      paid_amount: paid,
+      due_amount: due,
+      payment_status: due <= 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
+      notes: notes || null,
+    };
 
     create.mutate(
-      {
-        data: {
-          buyerId: String(buyerId),
-          invoiceNumber: rawInvoiceNum,
-          totalAmount,
-          paidAmount: paid,
-          paymentStatus: due <= 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
-          notes: notes || undefined,
-          items,
-        },
-      },
+      { data: payload },
       {
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getGetSalesQueryKey() });
@@ -200,6 +211,10 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           setItems([]);
           setPaidAmount('');
           setNotes('');
+        },
+        onError: (err: any) => {
+          console.error('Supabase Sale Creation Error:', err);
+          setErrorMessage(err?.message || 'Failed to post sale. Check database table schema columns.');
         },
       }
     );
@@ -251,7 +266,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                   <option value="">Select product...</option>
                   {products.data?.map((p: any) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({money(p.salePrice || p.sellingPrice || p.price)})
+                      {p.name} ({money(p.salePrice || p.sellingPrice || p.price || p.sale_price)})
                     </option>
                   ))}
                 </select>
@@ -339,7 +354,13 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
 
             {done && (
               <div data-testid="status-sale-success" className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
-                <Check size={14} /> Invoice posted. Ready for the next one.
+                <Check size={14} /> Invoice posted successfully.
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="rounded bg-destructive/10 p-2.5 text-xs font-semibold text-destructive">
+                {errorMessage}
               </div>
             )}
           </form>
@@ -374,7 +395,12 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                 </thead>
                 <tbody className="divide-y divide-border/70">
                   {sales.data.map((s: any) => {
-                    const cleanNum = String(s.invoiceNumber).replace(/^INV-?/i, '');
+                    const invNo = s.invoice_number || s.invoiceNumber || s.id;
+                    const cleanNum = String(invNo).replace(/^INV-?/i, '');
+                    const tot = s.total_amount ?? s.totalAmount ?? 0;
+                    const du = s.due_amount ?? s.dueAmount ?? 0;
+                    const status = s.payment_status || s.paymentStatus || 'unpaid';
+
                     return (
                       <tr
                         key={s.id}
@@ -384,21 +410,23 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                       >
                         <td className="py-3 font-mono text-xs font-bold">{cleanNum}</td>
                         <td className="py-3 font-semibold">
-                          {s.buyerName}
-                          <div className="text-[10px] text-muted-foreground">{timeDate(s.transactionTime)}</div>
+                          {s.buyerName || s.buyer_name || 'Walk-in Buyer'}
+                          <div className="text-[10px] text-muted-foreground">
+                            {timeDate(s.created_at || s.transactionTime)}
+                          </div>
                         </td>
                         <td className="py-3 font-mono">
-                          {money(s.totalAmount)}
-                          <div className="text-[10px] text-muted-foreground">Due {money(s.dueAmount)}</div>
+                          {money(tot)}
+                          <div className="text-[10px] text-muted-foreground">Due {money(du)}</div>
                         </td>
                         <td className="py-3">
                           <span
                             data-testid={`status-sale-${s.id}`}
                             className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${
-                              s.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-secondary text-primary'
+                              status === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-secondary text-primary'
                             }`}
                           >
-                            {s.paymentStatus}
+                            {status}
                           </span>
                         </td>
                         <td className="py-3 text-right" onClick={e => e.stopPropagation()}>
