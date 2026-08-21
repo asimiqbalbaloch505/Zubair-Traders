@@ -151,6 +151,7 @@ export function useGetSales() {
   return useQuery({
     queryKey: ['sales'],
     queryFn: async () => {
+      // Must use `supabase` instance, NOT standard fetch()
       const { data, error } = await supabase
         .from('sales_invoices')
         .select(`
@@ -163,7 +164,10 @@ export function useGetSales() {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Sales query error:", error);
+        throw error;
+      }
 
       return (data || []).map((s: any) => ({
         id: s.id,
