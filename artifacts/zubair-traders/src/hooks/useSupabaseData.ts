@@ -21,7 +21,6 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
 
       if (errSales) console.error('Sales fetch error:', errSales);
 
-      // Helper date checkers
       const now = new Date();
       
       const isWithinFilter = (dateString: string | Date | null) => {
@@ -61,20 +60,24 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
         return true;
       };
 
-      // Filtered Sales & Expenses for period metrics
+      // Filter sales and expenses by selected period
       const filteredSales = sales?.filter(s => isWithinFilter(s.created_at || s.transaction_time)) || [];
       const filteredExpenses = expenses?.filter(e => isWithinFilter(e.expense_date || e.created_at)) || [];
 
-      // Metric calculations
+      // Calculate Sales, Expenses, and Net Profit
       const totalSales = filteredSales.reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0);
       const totalExpenses = filteredExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
       const netProfit = totalSales - totalExpenses;
 
-      // Outstanding Balances (always current live status)
-      const totalBuyerReceivables = buyers?.reduce((acc, b) => acc + (Number(b.current_balance ?? b.currentBalance) || 0), 0) || 0;
+      // Period-filtered Buyer Receivables (unpaid due amounts from filtered sales)
+      const totalBuyerReceivables = filter === 'all_time'
+        ? (buyers?.reduce((acc, b) => acc + (Number(b.current_balance ?? b.currentBalance) || 0), 0) || 0)
+        : filteredSales.reduce((acc, s) => acc + (Number(s.due_amount ?? s.dueAmount ?? ((s.total_amount || 0) - (s.paid_amount || 0))) || 0), 0);
+
+      // Supplier Payables
       const totalSupplierPayables = suppliers?.reduce((acc, s) => acc + (Number(s.current_balance ?? s.currentBalance) || 0), 0) || 0;
 
-      // Dynamic Trend Chart (last 7 days by default)
+      // 7-Day Sales Trend Bar Chart
       const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const salesTrend = Array.from({ length: 7 }).map((_, i) => {
         const d = new Date();

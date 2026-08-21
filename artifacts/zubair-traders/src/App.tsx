@@ -175,7 +175,7 @@ function DashboardOverview({ money, navigate }: any) {
             onChange={(e) => setFilter(e.target.value)}
             className="h-10 rounded-lg border border-input bg-background px-3 text-xs font-semibold text-foreground outline-none focus:border-primary shadow-xs"
           >
-            <option value="this_month">This Month (Default)</option>
+            <option value="this_month">This Month</option>
             <option value="today">Today</option>
             <option value="this_week">This Week</option>
             <option value="last_month">Last Month</option>
