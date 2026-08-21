@@ -253,15 +253,17 @@ export function useCreateSale() {
 
       if (data.items && data.items.length > 0) {
         const lineItems = data.items.map((item: any) => ({
-          sales_invoice_id: resInvoice.id,
-          product_id: item.productId,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          total_price: item.totalPrice,
+          invoice_id: resInvoice.id, // Fixed: Uses invoice_id column
+          product_id: item.productId || item.product_id,
+          quantity: Number(item.quantity || item.qty || 1),
+          unit_price: Number(item.unitPrice || item.unit_price || 0),
+          unit_cost: Number(item.unitCost || item.unit_cost || 0),
+          subtotal: Number(item.subtotal || item.totalPrice || (item.quantity * item.unitPrice) || 0)
         }));
 
-        const { error: itemsError } = await supabase.from('sales_items').insert(lineItems);
-        if (itemsError) console.warn('Item insertion skipped/failed:', itemsError.message);
+        // Fixed: Inserts into sales_invoice_items
+        const { error: itemsError } = await supabase.from('sales_invoice_items').insert(lineItems);
+        if (itemsError) console.error('Item insertion failed:', itemsError.message);
       }
 
       return resInvoice;
