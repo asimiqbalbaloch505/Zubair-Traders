@@ -161,33 +161,42 @@ export function useGetSales() {
             products(name)
           )
         `)
-        .order('transaction_time', { ascending: false }); // <-- Fixed column name here!
+        .order('transaction_time', { ascending: false });
 
       if (error) {
         console.error("Sales query error:", error);
         throw error;
       }
 
-      return (data || []).map((s: any) => ({
-        id: s.id,
-        invoiceNumber: s.invoice_number ? `INV-${s.invoice_number}` : `INV-${s.id}`,
-        buyerName: s.buyers?.name || 'Walk-in',
-        totalAmount: s.total_amount,
-        paidAmount: s.paid_amount,
-        dueAmount: s.due_amount ?? ((s.total_amount || 0) - (s.paid_amount || 0)),
-        paymentStatus: s.payment_status ? String(s.payment_status).toLowerCase() : 'unpaid',
-        transactionTime: s.transaction_time,
-        notes: s.notes,
-        items: (s.sales_invoice_items || []).map((item: any) => ({
-          id: item.id,
-          productId: item.product_id,
-          productName: item.products?.name || 'Item',
-          quantity: item.quantity,
-          unitPrice: item.unit_price,
-          unitCost: item.unit_cost,
-          subtotal: item.subtotal
-        }))
-      }));
+      return (data || []).map((s: any) => {
+        // Standardize status for exact UI filter matches
+        let status = String(s.payment_status || 'unpaid').toLowerCase();
+        if (status === 'partially_paid' || status === 'partially paid') status = 'partial';
+        if (status === 'due') status = 'unpaid';
+
+        return {
+          id: s.id,
+          invoiceNumber: s.invoice_number ? `INV-${s.invoice_number}` : `INV-${s.id}`,
+          buyerName: s.buyers?.name || 'Walk-in',
+          totalAmount: s.total_amount,
+          paidAmount: s.paid_amount,
+          dueAmount: s.due_amount ?? ((s.total_amount || 0) - (s.paid_amount || 0)),
+          paymentStatus: status, // Matches 'paid', 'partial', 'unpaid'
+          rawPaymentStatus: s.payment_status,
+          transactionTime: s.transaction_time,
+          notes: s.notes,
+          items: (s.sales_invoice_items || []).map((item: any) => ({
+            id: item.id,
+            productId: item.product_id,
+            productName: item.products?.name || 'Unknown Product',
+            name: item.products?.name || 'Unknown Product', // Included for legacy UI compatibility
+            quantity: item.quantity,
+            unitPrice: item.unit_price,
+            unitCost: item.unit_cost,
+            subtotal: item.subtotal
+          }))
+        };
+      });
     }
   });
 }
