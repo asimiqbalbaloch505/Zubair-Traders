@@ -151,38 +151,50 @@ export function useGetSales(_options?: any) {
   return useQuery({
     queryKey: ['sales'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('sales_invoices')
-        .select('*, buyers(name), sales_items(*, products(name))');
-        
-      if (error) throw error;
+      // 1. Fetch invoices, buyers, and items independently to avoid missing FK join 400 errors
+      const [
+        { data: invoices, error: invError },
+        { data: buyers, error: buyerError },
+        { data: items, error: itemsError }
+      ] = await Promise.all([
+        supabase.from('sales_invoices').select('*').order('created_at', { ascending: false }),
+        supabase.from('buyers').select('id, name'),
+        supabase.from('sales_items').select('*')
+      ]);
 
-      return (data || []).map(s => {
+      if (invError) throw invError;
+
+      // Map relational lookups manually
+      const buyerMap = new Map((buyers || []).map(b => [b.id, b.name]));
+
+      return (invoices || []).map(s => {
         let mappedStatus = 'unpaid';
         if (s.payment_status === 'PAID') mappedStatus = 'paid';
         else if (s.payment_status === 'PARTIALLY_PAID') mappedStatus = 'partial';
         else if (s.payment_status === 'DUE') mappedStatus = 'unpaid';
         else if (s.payment_status) mappedStatus = String(s.payment_status).toLowerCase();
 
-        const mappedItems = (s.sales_items || []).map((item: any) => ({
-          productId: item.product_id,
-          productName: item.products?.name || item.product_name || 'Item',
-          quantity: item.quantity,
-          unitPrice: item.unit_price,
-          totalPrice: item.total_price || item.unit_price * item.quantity,
-        }));
+        const invoiceItems = (items || [])
+          .filter((item: any) => item.sales_invoice_id === s.id || item.invoice_id === s.id)
+          .map((item: any) => ({
+            productId: item.product_id,
+            productName: item.product_name || 'Item',
+            quantity: item.quantity,
+            unitPrice: item.unit_price,
+            totalPrice: item.total_price || (item.unit_price * item.quantity),
+          }));
 
         return {
           id: s.id,
           invoiceNumber: s.invoice_number ? `INV-${s.invoice_number}` : `INV-${s.id}`,
-          buyerName: s.buyers?.name || 'Walk-in',
+          buyerName: buyerMap.get(s.buyer_id) || 'Walk-in',
           totalAmount: s.total_amount,
           paidAmount: s.paid_amount,
           dueAmount: s.due_amount ?? ((s.total_amount || 0) - (s.paid_amount || 0)),
           paymentStatus: mappedStatus,
           transactionTime: s.transaction_time || s.created_at,
           notes: s.notes,
-          items: mappedItems.length > 0 ? mappedItems : s.items || [],
+          items: invoiceItems,
         };
       });
     },
