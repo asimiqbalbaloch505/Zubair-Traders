@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 
-export function useGetDashboard(_options?: any) {
+export function useGetDashboard(filter: string = 'this_month', customMonth?: string) {
   return useQuery({
-    queryKey: ['dashboard'],
+    queryKey: ['dashboard', filter, customMonth],
     queryFn: async () => {
       const [
         { data: sales, error: errSales },
@@ -21,16 +21,60 @@ export function useGetDashboard(_options?: any) {
 
       if (errSales) console.error('Sales fetch error:', errSales);
 
-      // Calculations
-      const totalSales = sales?.reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0) || 0;
-      const totalBuyerReceivables = buyers?.reduce((acc, b) => acc + (Number(b.current_balance ?? b.currentBalance) || 0), 0) || 0;
-      const totalSupplierPayables = suppliers?.reduce((acc, s) => acc + (Number(s.current_balance ?? s.currentBalance) || 0), 0) || 0;
-      const totalExpenses = expenses?.reduce((acc, e) => acc + (Number(e.amount) || 0), 0) || 0;
+      // Helper date checkers
+      const now = new Date();
+      
+      const isWithinFilter = (dateString: string | Date | null) => {
+        if (!dateString) return false;
+        const d = new Date(dateString);
+        
+        if (filter === 'all_time') return true;
+        
+        if (filter === 'today') {
+          return d.toDateString() === now.toDateString();
+        }
+        
+        if (filter === 'this_week') {
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(now.getDate() - 7);
+          return d >= sevenDaysAgo && d <= now;
+        }
 
-      // Net Profit = Total Sales - Total Expenses
+        if (filter === 'this_month') {
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        }
+
+        if (filter === 'last_month') {
+          const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          return d.getMonth() === lastMonth.getMonth() && d.getFullYear() === lastMonth.getFullYear();
+        }
+
+        if (filter === 'this_year') {
+          return d.getFullYear() === now.getFullYear();
+        }
+
+        if (filter === 'custom_month' && customMonth) {
+          const [year, month] = customMonth.split('-').map(Number);
+          return d.getFullYear() === year && (d.getMonth() + 1) === month;
+        }
+
+        return true;
+      };
+
+      // Filtered Sales & Expenses for period metrics
+      const filteredSales = sales?.filter(s => isWithinFilter(s.created_at || s.transaction_time)) || [];
+      const filteredExpenses = expenses?.filter(e => isWithinFilter(e.expense_date || e.created_at)) || [];
+
+      // Metric calculations
+      const totalSales = filteredSales.reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0);
+      const totalExpenses = filteredExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
       const netProfit = totalSales - totalExpenses;
 
-      // Last 7 Days Calculation (Sunday - Saturday)
+      // Outstanding Balances (always current live status)
+      const totalBuyerReceivables = buyers?.reduce((acc, b) => acc + (Number(b.current_balance ?? b.currentBalance) || 0), 0) || 0;
+      const totalSupplierPayables = suppliers?.reduce((acc, s) => acc + (Number(s.current_balance ?? s.currentBalance) || 0), 0) || 0;
+
+      // Dynamic Trend Chart (last 7 days by default)
       const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const salesTrend = Array.from({ length: 7 }).map((_, i) => {
         const d = new Date();
@@ -39,13 +83,12 @@ export function useGetDashboard(_options?: any) {
         const dayLabel = daysOfWeek[d.getDay()];
         const dateString = `${d.getMonth() + 1}/${d.getDate()}`;
         
-        // Sum matching day sales
-        const dayTotal = sales
-          ?.filter(s => {
+        const dayTotal = (sales || [])
+          .filter(s => {
             const saleDate = new Date(s.created_at || s.transaction_time || Date.now());
             return saleDate.toDateString() === d.toDateString();
           })
-          .reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0) || 0;
+          .reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0);
 
         return {
           day: dayLabel,
@@ -56,16 +99,15 @@ export function useGetDashboard(_options?: any) {
 
       return {
         totalSales,
-        totalBuyerReceivables,
-        totalSupplierPayables,
         totalExpenses,
         netProfit,
+        totalBuyerReceivables,
+        totalSupplierPayables,
         salesTrend,
       };
     },
   });
 }
-
 export function useGetBuyers(_options?: any) {
   return useQuery({
     queryKey: ['buyers'],

@@ -145,7 +145,10 @@ function Empty({ title, detail, action }: any) {
 }
 
 function DashboardOverview({ money, navigate }: any) {
-  const dash = useGetDashboard({ query: { queryKey: getGetDashboardQueryKey() } });
+  const [filter, setFilter] = useState<string>('this_month');
+  const [customMonth, setCustomMonth] = useState<string>('');
+
+  const dash = useGetDashboard(filter, customMonth);
 
   if (dash.isLoading) return <Loading />;
   if (dash.isError) return <Failed onRetry={() => dash.refetch()} />;
@@ -158,7 +161,39 @@ function DashboardOverview({ money, navigate }: any) {
 
   return (
     <div className="space-y-6 animate-in">
-      <PageIntro eyebrow="Operations summary" title="Dashboard" detail="Zubair Traders cash position, sales volume, and quick actions." />
+      {/* Header & Date Filter Selector */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <PageIntro 
+          eyebrow="Operations summary" 
+          title="Dashboard" 
+          detail="Zubair Traders cash position, sales volume, and quick actions." 
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="h-10 rounded-lg border border-input bg-background px-3 text-xs font-semibold text-foreground outline-none focus:border-primary shadow-xs"
+          >
+            <option value="this_month">This Month (Default)</option>
+            <option value="today">Today</option>
+            <option value="this_week">This Week</option>
+            <option value="last_month">Last Month</option>
+            <option value="this_year">This Year</option>
+            <option value="all_time">All Time</option>
+            <option value="custom_month">Select Specific Month...</option>
+          </select>
+
+          {filter === 'custom_month' && (
+            <input
+              type="month"
+              value={customMonth}
+              onChange={(e) => setCustomMonth(e.target.value)}
+              className="h-10 rounded-lg border border-input bg-background px-3 text-xs font-medium text-foreground outline-none focus:border-primary"
+            />
+          )}
+        </div>
+      </div>
 
       {/* 5-Metric Executive Overview Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -212,7 +247,7 @@ function DashboardOverview({ money, navigate }: any) {
         </div>
       </div>
 
-      {/* Last 7 Days Sales Trend Graph */}
+      {/* Weekly Sales Rhythm Bar Chart */}
       <div className="panel rounded-xl p-5">
         <div className="flex items-center justify-between">
           <div>
@@ -231,11 +266,9 @@ function DashboardOverview({ money, navigate }: any) {
               return (
                 <div key={point.day} className="group flex min-w-0 flex-1 flex-col items-center gap-2">
                   <div className="relative flex h-40 w-full items-end justify-center">
-                    {/* Hover Value Popup */}
                     <div className="absolute -top-7 rounded bg-foreground px-2 py-1 font-mono text-[10px] text-background opacity-0 transition-all group-hover:opacity-100 z-10 shadow-lg pointer-events-none">
                       {money(point.value)}
                     </div>
-                    {/* Bar Visual */}
                     <div 
                       className="w-full max-w-[36px] rounded-t-md bg-primary/80 transition-all duration-300 group-hover:bg-primary" 
                       style={{ height: `${heightPercent}%` }} 
@@ -256,7 +289,7 @@ function DashboardOverview({ money, navigate }: any) {
         </div>
       </div>
 
-      {/* Quick Actions Panel */}
+      {/* Quick Actions */}
       <div className="panel rounded-xl p-5">
         <h3 className="font-bold">Quick Actions</h3>
         <p className="mb-4 text-xs text-muted-foreground">Jump directly to common tasks</p>
