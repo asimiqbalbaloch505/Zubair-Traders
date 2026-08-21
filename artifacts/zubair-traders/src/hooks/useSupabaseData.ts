@@ -5,31 +5,49 @@ export function useGetDashboard(_options?: any) {
   return useQuery({
     queryKey: ['dashboard'],
     queryFn: async () => {
-      const [{ data: sales }, { data: products }, { data: buyers }, { data: suppliers }] = await Promise.all([
+      const [
+        { data: sales },
+        { data: products },
+        { data: buyers },
+        { data: suppliers },
+        { data: expenses }
+      ] = await Promise.all([
         supabase.from('sales_invoices').select('*'),
         supabase.from('products').select('*'),
         supabase.from('buyers').select('*'),
         supabase.from('suppliers').select('*'),
+        supabase.from('expenses').select('*'),
       ]);
 
-      const dailySales = sales?.reduce((acc, s) => acc + (Number(s.total_amount) || 0), 0) || 0;
-      const buyerDebt = buyers?.reduce((acc, b) => acc + (Number(b.current_balance) || 0), 0) || 0;
-      const supplierOwed = suppliers?.reduce((acc, s) => acc + (Number(s.current_balance) || 0), 0) || 0;
-      const lowStock = products?.filter(p => (p.stock_quantity || 0) <= (p.min_stock_alert || 0)) || [];
+      // Calculate totals handling both snake_case and camelCase field structures
+      const totalInvoiced = sales?.reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0) || 0;
+      const buyerDebt = buyers?.reduce((acc, b) => acc + (Number(b.current_balance ?? b.currentBalance) || 0), 0) || 0;
+      const supplierOwed = suppliers?.reduce((acc, s) => acc + (Number(s.current_balance ?? s.currentBalance) || 0), 0) || 0;
+      const expensesLogged = expenses?.reduce((acc, e) => acc + (Number(e.amount) || 0), 0) || 0;
+
+      const lowStock = products?.filter(p => (p.stock_quantity ?? p.stockQuantity ?? 0) <= (p.min_stock_alert ?? p.minStockAlert ?? 0)) || [];
 
       return {
-        dailySales,
-        todaysProfit: dailySales * 0.15,
+        // Properties used in Dashboard.tsx
+        dailySales: totalInvoiced,
+        todaysProfit: totalInvoiced * 0.15,
         buyerDebt,
         supplierOwed,
-        cashInDrawer: dailySales,
+        cashInDrawer: totalInvoiced,
+        
+        // Properties used in the component variation shown in screenshot
+        totalInvoiced,
+        buyerReceivables: buyerDebt,
+        supplierPayables: supplierOwed,
+        expensesLogged,
+
         salesTrend: [],
         lowStock: lowStock.map(p => ({
           id: p.id,
           name: p.name,
           unit: p.unit,
-          stockQuantity: p.stock_quantity,
-          minStockAlert: p.min_stock_alert,
+          stockQuantity: p.stock_quantity ?? p.stockQuantity,
+          minStockAlert: p.min_stock_alert ?? p.minStockAlert,
         })),
         recentActivity: [],
       };
@@ -49,8 +67,8 @@ export function useGetBuyers(_options?: any) {
         phone: b.phone,
         cnic: b.cnic,
         address: b.address,
-        creditLimit: b.credit_limit,
-        currentBalance: b.current_balance,
+        creditLimit: b.credit_limit ?? b.creditLimit,
+        currentBalance: b.current_balance ?? b.currentBalance,
       }));
     },
   });
