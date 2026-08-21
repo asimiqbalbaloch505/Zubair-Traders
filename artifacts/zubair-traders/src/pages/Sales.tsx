@@ -162,8 +162,15 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     const prod = products.data?.find((p: any) => String(p.id) === String(selectedProductId));
     if (!prod) return;
 
+    // Correctly resolve stock quantity from all possible prop names
+    const availableStock = Number(prod.stockQuantity ?? prod.stock_quantity ?? prod.stock ?? prod.quantity ?? 0);
+
+    if (availableStock <= 0) {
+      setErrorMessage(`Cannot add "${prod.name}" as it is currently out of stock.`);
+      return;
+    }
+
     const requestedQty = Math.max(Number(itemQty) || 1, 1);
-    const availableStock = prod.stock ?? prod.quantity ?? prod.stock_quantity ?? Infinity;
 
     // Check existing qty already in cart
     const existingCartItem = items.find(i => String(i.productId) === String(prod.id));
@@ -301,11 +308,13 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                 >
                   <option value="">Select product...</option>
                   {products.data?.map((p: any) => {
-                    const availableStock = p.stock ?? p.quantity ?? p.stock_quantity;
-                    const stockLabel = availableStock !== undefined ? ` | Stock: ${availableStock}` : '';
+                    const availableStock = Number(p.stockQuantity ?? p.stock_quantity ?? p.stock ?? p.quantity ?? 0);
+                    const isOutOfStock = availableStock <= 0;
+                    const stockText = isOutOfStock ? '— (Out of Stock)' : `| Stock: ${availableStock}`;
+                    
                     return (
-                      <option key={p.id} value={p.id} disabled={availableStock <= 0}>
-                        {p.name} ({money(p.salePrice || p.sellingPrice || p.price || p.sale_price)}){stockLabel}
+                      <option key={p.id} value={p.id} disabled={isOutOfStock}>
+                        {p.name} ({money(p.salePrice || p.sellingPrice || p.price || p.sale_price)}) {stockText}
                       </option>
                     );
                   })}
