@@ -74,7 +74,7 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
                 <tr className="border-b text-muted-foreground">
                   <th className="pb-1">Item</th>
                   <th className="pb-1 text-center">Qty</th>
-                  <th className="pb-1 text-right">Price</th>
+                  <th className="pb-1 text-right">Unit Price</th>
                   <th className="pb-1 text-right">Total</th>
                 </tr>
               </thead>
@@ -149,6 +149,20 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
 
   const [selectedProductId, setSelectedProductId] = useState('');
   const [itemQty, setItemQty] = useState('1');
+  const [itemUnitPrice, setItemUnitPrice] = useState('');
+
+  const handleProductSelect = (productId: string) => {
+    setSelectedProductId(productId);
+    if (!productId) {
+      setItemUnitPrice('');
+      return;
+    }
+    const prod = products.data?.find((p: any) => String(p.id) === String(productId));
+    if (prod) {
+      const defaultPrice = Number(prod.salePrice || prod.sellingPrice || prod.price || prod.sale_price || 0);
+      setItemUnitPrice(String(defaultPrice));
+    }
+  };
 
   const totalAmount = useMemo(() => {
     return items.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -170,6 +184,8 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     }
 
     const requestedQty = Math.max(Number(itemQty) || 1, 1);
+    const customUnitPrice = Math.max(Number(itemUnitPrice) || 0, 0);
+
     const existingCartItem = items.find(i => String(i.productId) === String(prod.id));
     const currentCartQty = existingCartItem ? existingCartItem.quantity : 0;
 
@@ -179,7 +195,6 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     }
 
     setErrorMessage(null);
-    const unitPrice = Number(prod.salePrice || prod.sellingPrice || prod.price || prod.sale_price || 0);
 
     setItems(prev => {
       if (existingCartItem) {
@@ -189,7 +204,8 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
             return {
               ...item,
               quantity: newQty,
-              totalPrice: newQty * item.unitPrice,
+              unitPrice: customUnitPrice,
+              totalPrice: newQty * customUnitPrice,
             };
           }
           return item;
@@ -201,14 +217,15 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           productId: prod.id,
           productName: prod.name,
           quantity: requestedQty,
-          unitPrice,
-          totalPrice: unitPrice * requestedQty,
+          unitPrice: customUnitPrice,
+          totalPrice: customUnitPrice * requestedQty,
         },
       ];
     });
 
     setSelectedProductId('');
     setItemQty('1');
+    setItemUnitPrice('');
   };
 
   const removeItem = (index: number) => {
@@ -297,10 +314,10 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
 
             <div className="rounded-lg border bg-muted/30 p-3">
               <div className="mb-2 text-xs font-semibold text-muted-foreground">Add Products to Sale</div>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <select
                   value={selectedProductId}
-                  onChange={e => setSelectedProductId(e.target.value)}
+                  onChange={e => handleProductSelect(e.target.value)}
                   className="h-10 flex-1 rounded-lg border border-input bg-background px-3 text-sm font-medium outline-none focus:border-primary"
                 >
                   <option value="">Select product...</option>
@@ -316,17 +333,30 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                     );
                   })}
                 </select>
-                <input
-                  type="number"
-                  min="1"
-                  value={itemQty}
-                  onChange={e => setItemQty(e.target.value)}
-                  placeholder="Qty"
-                  className="h-10 w-20 rounded-lg border border-input bg-background px-2 text-center text-sm outline-none focus:border-primary"
-                />
-                <Button testId="button-add-item" type="button" onClick={addItem} disabled={!selectedProductId}>
-                  <Plus size={16} /> Add
-                </Button>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    value={itemQty}
+                    onChange={e => setItemQty(e.target.value)}
+                    placeholder="Qty"
+                    title="Quantity"
+                    className="h-10 w-20 rounded-lg border border-input bg-background px-2 text-center text-sm outline-none focus:border-primary"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={itemUnitPrice}
+                    onChange={e => setItemUnitPrice(e.target.value)}
+                    placeholder="Unit Price"
+                    title="Custom Unit Price"
+                    className="h-10 w-28 rounded-lg border border-input bg-background px-2 text-center text-sm outline-none focus:border-primary"
+                  />
+                  <Button testId="button-add-item" type="button" onClick={addItem} disabled={!selectedProductId}>
+                    <Plus size={16} /> Add
+                  </Button>
+                </div>
               </div>
 
               {items.length > 0 && (
