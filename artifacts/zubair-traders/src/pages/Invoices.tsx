@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { FileText, Printer, Search, Filter, Calendar, X } from 'lucide-react';
-import { useGetSales, useGetBuyerPayments } from '../hooks/useSupabaseData';
+import { useGetSales, useGetBuyerPayments, useGetPurchases } from '../hooks/useSupabaseData';
 
 export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
   const sales = useGetSales();
   const buyerPayments = useGetBuyerPayments();
+  const purchases = useGetPurchases();
 
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -12,10 +13,10 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'partial' | 'unpaid'>('all');
   const [dateFilter, setDateFilter] = useState('');
 
-  const isLoading = sales.isLoading || buyerPayments.isLoading;
-  const isError = sales.isError || buyerPayments.isError;
+  const isLoading = sales.isLoading || buyerPayments.isLoading || purchases.isLoading;
+  const isError = sales.isError || buyerPayments.isError || purchases.isError;
 
-  // Combine Sales Invoices and Udhaar Buyer Payments into a single dataset
+  // Combine Sales, Udhaar Buyer Payments, and Purchase Invoices into a single dataset
   const combinedRecords = useMemo(() => {
     const salesList = (sales.data || []).map((s: any) => ({
       ...s,
@@ -48,23 +49,48 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
         notes: p.notes || 'Udhaar Payment Collected',
         recordType: 'udhaar',
         displayType: 'Udhaar Payment',
-        items: [], // Udhaar receipts don't have line items
+        items: [],
       };
     });
 
-    return [...salesList, ...udhaarList].sort((a, b) => {
+    const purchaseList = (purchases.data || []).map((pur: any) => {
+      const supplierName = pur.suppliers?.name || pur.supplier_name || 'Walk-in / Cash Purchase';
+      const purNo = pur.id ? `PUR-${pur.id}` : 'PUR-INV';
+
+      return {
+        ...pur,
+        id: `purchase-${pur.id}`,
+        invoiceNumber: purNo,
+        invoice_number: purNo,
+        buyerName: supplierName,
+        buyer_name: supplierName,
+        created_at: pur.created_at || pur.transaction_time,
+        transactionTime: pur.created_at || pur.transaction_time,
+        totalAmount: Number(pur.total_amount || 0),
+        total_amount: Number(pur.total_amount || 0),
+        paidAmount: Number(pur.paid_amount || 0),
+        paid_amount: Number(pur.paid_amount || 0),
+        dueAmount: Number(pur.due_amount || 0),
+        due_amount: Number(pur.due_amount || 0),
+        paymentStatus: pur.payment_status || 'paid',
+        payment_status: pur.payment_status || 'paid',
+        recordType: 'purchase',
+        displayType: 'Purchase',
+        items: pur.items || pur.purchase_invoice_items || [],
+      };
+    });
+
+    return [...salesList, ...udhaarList, ...purchaseList].sort((a, b) => {
       const dateA = new Date(a.created_at || a.transactionTime || 0).getTime();
       const dateB = new Date(b.created_at || b.transactionTime || 0).getTime();
       return dateB - dateA;
     });
-  }, [sales.data, buyerPayments.data]);
+  }, [sales.data, buyerPayments.data, purchases.data]);
 
   const filteredInvoices = useMemo(() => {
     return combinedRecords.filter((inv: any) => {
       // Type filtering
-      if (typeFilter === 'purchase') return false;
-      if (typeFilter === 'sales' && inv.recordType !== 'sales') return false;
-      if (typeFilter === 'udhaar' && inv.recordType !== 'udhaar') return false;
+      if (typeFilter !== 'all' && inv.recordType !== typeFilter) return false;
 
       // Status filtering
       const status = String(inv.paymentStatus || inv.payment_status || '').toLowerCase();
@@ -97,6 +123,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
   const handleRetry = () => {
     sales.refetch();
     buyerPayments.refetch();
+    purchases.refetch();
   };
 
   return (
@@ -114,7 +141,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search by invoice # or client..."
+              placeholder="Search by invoice # or client/supplier..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none focus:border-primary"
@@ -183,7 +210,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                 <tr>
                   <th className="pb-3">Invoice / Rec #</th>
                   <th className="pb-3">Type</th>
-                  <th className="pb-3">Client / Party</th>
+                  <th className="pb-3">Client / Supplier</th>
                   <th className="pb-3">Date</th>
                   <th className="pb-3">Total</th>
                   <th className="pb-3">Status</th>
@@ -194,7 +221,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                 {filteredInvoices.map((inv: any) => {
                   const invNo = inv.invoiceNumber || inv.invoice_number || inv.id;
                   const cleanNum = String(invNo).replace(/^INV-?/i, '');
-                  const buyer = inv.buyerName || inv.buyer_name || 'Walk-in Buyer';
+                  const buyer = inv.buyerName || inv.buyer_name || 'Walk-in Party';
                   const date = inv.created_at || inv.transactionTime;
                   const total = inv.totalAmount ?? inv.total_amount ?? 0;
                   const status = String(inv.paymentStatus || inv.payment_status || 'unpaid').toLowerCase();
@@ -213,6 +240,8 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                           className={`rounded px-2 py-0.5 font-semibold ${
                             inv.recordType === 'udhaar'
                               ? 'bg-emerald-100 text-emerald-800'
+                              : inv.recordType === 'purchase'
+                              ? 'bg-blue-100 text-blue-800'
                               : 'bg-muted text-muted-foreground'
                           }`}
                         >
@@ -263,17 +292,25 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
       {/* Invoice Detail View Modal */}
       {selectedInvoice && (
         <Modal
-          title={`${selectedInvoice.recordType === 'udhaar' ? 'Payment Receipt' : 'Invoice'} #${String(
+          title={`${selectedInvoice.displayType} #${String(
             selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.id
           ).replace(/^INV-?/i, '')}`}
-          eyebrow={selectedInvoice.recordType === 'udhaar' ? 'Udhaar Payment Receipt' : 'Invoice Itemized Statement'}
+          eyebrow={
+            selectedInvoice.recordType === 'udhaar'
+              ? 'Udhaar Payment Receipt'
+              : selectedInvoice.recordType === 'purchase'
+              ? 'Supplier Restock Invoice'
+              : 'Invoice Itemized Statement'
+          }
           onClose={() => setSelectedInvoice(null)}
         >
           <div className="space-y-4 text-sm printable-invoice">
             <div className="flex justify-between border-b pb-3 text-xs text-muted-foreground">
               <div>
-                <span className="font-semibold text-foreground">Client:</span>{' '}
-                {selectedInvoice.buyerName || selectedInvoice.buyer_name || 'Walk-in Buyer'}
+                <span className="font-semibold text-foreground">
+                  {selectedInvoice.recordType === 'purchase' ? 'Supplier:' : 'Client:'}
+                </span>{' '}
+                {selectedInvoice.buyerName || selectedInvoice.buyer_name || 'Walk-in Party'}
               </div>
               <div>
                 <span className="font-semibold text-foreground">Date:</span>{' '}
@@ -302,17 +339,25 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                     <tr className="border-b text-muted-foreground">
                       <th className="pb-1">Item Description</th>
                       <th className="pb-1 text-center">Qty</th>
-                      <th className="pb-1 text-right">Unit Price</th>
+                      <th className="pb-1 text-right">
+                        {selectedInvoice.recordType === 'purchase' ? 'Purchase Cost' : 'Unit Price'}
+                      </th>
                       <th className="pb-1 text-right">Subtotal</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {selectedInvoice.items.map((item: any, idx: number) => (
                       <tr key={idx}>
-                        <td className="py-1.5 font-medium">{item.productName || item.product_name}</td>
+                        <td className="py-1.5 font-medium">
+                          {item.products?.name || item.productName || item.product_name || `Product #${item.product_id}`}
+                        </td>
                         <td className="py-1.5 text-center">{item.quantity}</td>
-                        <td className="py-1.5 text-right">{money(item.unitPrice ?? item.unit_price ?? 0)}</td>
-                        <td className="py-1.5 text-right font-mono">{money(item.totalPrice ?? item.total_price ?? 0)}</td>
+                        <td className="py-1.5 text-right">
+                          {money(item.purchase_cost ?? item.unitCost ?? item.unitPrice ?? item.unit_price ?? 0)}
+                        </td>
+                        <td className="py-1.5 text-right font-mono">
+                          {money(item.subtotal ?? item.totalPrice ?? item.total_price ?? (item.quantity * (item.purchase_cost || 0)))}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
