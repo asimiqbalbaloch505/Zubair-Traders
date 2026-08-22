@@ -1,21 +1,70 @@
 import React, { useState, useMemo } from 'react';
 import { FileText, Printer, Search, Filter, Calendar, X } from 'lucide-react';
-import { useGetSales } from '../hooks/useSupabaseData';
+import { useGetSales, useGetBuyerPayments } from '../hooks/useSupabaseData';
 
 export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
   const sales = useGetSales();
+  const buyerPayments = useGetBuyerPayments();
+
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'sales' | 'purchase'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'sales' | 'udhaar' | 'purchase'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'partial' | 'unpaid'>('all');
   const [dateFilter, setDateFilter] = useState('');
 
-  const filteredInvoices = useMemo(() => {
-    if (!sales.data) return [];
+  const isLoading = sales.isLoading || buyerPayments.isLoading;
+  const isError = sales.isError || buyerPayments.isError;
 
-    return sales.data.filter((inv: any) => {
+  // Combine Sales Invoices and Udhaar Buyer Payments into a single dataset
+  const combinedRecords = useMemo(() => {
+    const salesList = (sales.data || []).map((s: any) => ({
+      ...s,
+      recordType: 'sales',
+      displayType: 'Sales',
+    }));
+
+    const udhaarList = (buyerPayments.data || []).map((p: any) => {
+      const buyerName = p.buyers?.name || 'Walk-in Buyer';
+      const recNo = p.id ? `REC-${p.id}` : 'REC-PAYMENT';
+      const amount = Number(p.amount || 0);
+
+      return {
+        id: `udhaar-${p.id}`,
+        invoiceNumber: recNo,
+        invoice_number: recNo,
+        buyerName: buyerName,
+        buyer_name: buyerName,
+        created_at: p.created_at,
+        transactionTime: p.created_at,
+        totalAmount: amount,
+        total_amount: amount,
+        paidAmount: amount,
+        paid_amount: amount,
+        dueAmount: 0,
+        due_amount: 0,
+        paymentStatus: 'paid',
+        payment_status: 'paid',
+        paymentMethod: p.payment_method || 'Cash',
+        notes: p.notes || 'Udhaar Payment Collected',
+        recordType: 'udhaar',
+        displayType: 'Udhaar Payment',
+        items: [], // Udhaar receipts don't have line items
+      };
+    });
+
+    return [...salesList, ...udhaarList].sort((a, b) => {
+      const dateA = new Date(a.created_at || a.transactionTime || 0).getTime();
+      const dateB = new Date(b.created_at || b.transactionTime || 0).getTime();
+      return dateB - dateA;
+    });
+  }, [sales.data, buyerPayments.data]);
+
+  const filteredInvoices = useMemo(() => {
+    return combinedRecords.filter((inv: any) => {
       // Type filtering
       if (typeFilter === 'purchase') return false;
+      if (typeFilter === 'sales' && inv.recordType !== 'sales') return false;
+      if (typeFilter === 'udhaar' && inv.recordType !== 'udhaar') return false;
 
       // Status filtering
       const status = String(inv.paymentStatus || inv.payment_status || '').toLowerCase();
@@ -43,14 +92,19 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
 
       return true;
     });
-  }, [sales.data, typeFilter, statusFilter, dateFilter, searchQuery]);
+  }, [combinedRecords, typeFilter, statusFilter, dateFilter, searchQuery]);
+
+  const handleRetry = () => {
+    sales.refetch();
+    buyerPayments.refetch();
+  };
 
   return (
     <div className="animate-in space-y-6">
       <PageIntro
         eyebrow="Billing Records"
         title="Invoices Directory"
-        detail="Search, filter by date, and review all line-itemized business invoices."
+        detail="Search, filter by date, and review all line-itemized business invoices and payment receipts."
       />
 
       <div className="panel rounded-xl p-5 border border-border/80">
@@ -100,6 +154,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
             >
               <option value="all">All Types</option>
               <option value="sales">Sales Invoices</option>
+              <option value="udhaar">Udhaar Payments</option>
               <option value="purchase">Purchase Invoices</option>
             </select>
 
@@ -118,15 +173,15 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
 
         {/* Invoice List Table */}
         <div className="overflow-x-auto">
-          {sales.isLoading ? (
+          {isLoading ? (
             <Loading />
-          ) : sales.isError ? (
-            <Failed onRetry={() => sales.refetch()} />
+          ) : isError ? (
+            <Failed onRetry={handleRetry} />
           ) : filteredInvoices.length > 0 ? (
             <table className="w-full min-w-[600px] text-left text-sm">
               <thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th className="pb-3">Invoice #</th>
+                  <th className="pb-3">Invoice / Rec #</th>
                   <th className="pb-3">Type</th>
                   <th className="pb-3">Client / Party</th>
                   <th className="pb-3">Date</th>
@@ -154,8 +209,14 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                         {cleanNum}
                       </td>
                       <td className="py-3 text-xs">
-                        <span className="rounded bg-muted px-2 py-0.5 font-semibold text-muted-foreground">
-                          Sales
+                        <span
+                          className={`rounded px-2 py-0.5 font-semibold ${
+                            inv.recordType === 'udhaar'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          {inv.displayType}
                         </span>
                       </td>
                       <td className="py-3 font-semibold text-foreground">
@@ -202,21 +263,39 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
       {/* Invoice Detail View Modal */}
       {selectedInvoice && (
         <Modal
-          title={`Invoice #${String(selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.id).replace(/^INV-?/i, '')}`}
-          eyebrow="Invoice Itemized Statement"
+          title={`${selectedInvoice.recordType === 'udhaar' ? 'Payment Receipt' : 'Invoice'} #${String(
+            selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.id
+          ).replace(/^INV-?/i, '')}`}
+          eyebrow={selectedInvoice.recordType === 'udhaar' ? 'Udhaar Payment Receipt' : 'Invoice Itemized Statement'}
           onClose={() => setSelectedInvoice(null)}
         >
           <div className="space-y-4 text-sm printable-invoice">
             <div className="flex justify-between border-b pb-3 text-xs text-muted-foreground">
               <div>
-                <span className="font-semibold text-foreground">Client:</span> {selectedInvoice.buyerName || selectedInvoice.buyer_name || 'Walk-in Buyer'}
+                <span className="font-semibold text-foreground">Client:</span>{' '}
+                {selectedInvoice.buyerName || selectedInvoice.buyer_name || 'Walk-in Buyer'}
               </div>
               <div>
-                <span className="font-semibold text-foreground">Date:</span> {timeDate(selectedInvoice.created_at || selectedInvoice.transactionTime)}
+                <span className="font-semibold text-foreground">Date:</span>{' '}
+                {timeDate(selectedInvoice.created_at || selectedInvoice.transactionTime)}
               </div>
             </div>
 
-            {selectedInvoice.items && selectedInvoice.items.length > 0 ? (
+            {selectedInvoice.recordType === 'udhaar' ? (
+              <div className="rounded-lg bg-emerald-50/60 p-4 border border-emerald-200/50 space-y-2">
+                <div className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">
+                  Udhaar Repayment Detail
+                </div>
+                <div className="text-sm text-foreground">
+                  <strong>Notes / Reference:</strong> {selectedInvoice.notes || 'Udhaar Payment Collected'}
+                </div>
+                {selectedInvoice.paymentMethod && (
+                  <div className="text-xs text-muted-foreground">
+                    <strong>Payment Method:</strong> {selectedInvoice.paymentMethod}
+                  </div>
+                )}
+              </div>
+            ) : selectedInvoice.items && selectedInvoice.items.length > 0 ? (
               <div className="max-h-56 overflow-y-auto border-y py-2">
                 <table className="w-full text-left text-xs">
                   <thead>
@@ -248,15 +327,21 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
             <div className="space-y-1.5 rounded-lg bg-muted/60 p-3 text-xs">
               <div className="flex justify-between">
                 <span>Total Amount:</span>
-                <span className="font-mono font-bold">{money(selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0)}</span>
+                <span className="font-mono font-bold">
+                  {money(selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0)}
+                </span>
               </div>
               <div className="flex justify-between text-emerald-700">
                 <span>Paid Amount:</span>
-                <span className="font-mono font-bold">{money(selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0)}</span>
+                <span className="font-mono font-bold">
+                  {money(selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0)}
+                </span>
               </div>
               <div className="flex justify-between text-destructive">
                 <span>Balance Due:</span>
-                <span className="font-mono font-bold">{money(selectedInvoice.dueAmount ?? selectedInvoice.due_amount ?? 0)}</span>
+                <span className="font-mono font-bold">
+                  {money(selectedInvoice.dueAmount ?? selectedInvoice.due_amount ?? 0)}
+                </span>
               </div>
             </div>
 

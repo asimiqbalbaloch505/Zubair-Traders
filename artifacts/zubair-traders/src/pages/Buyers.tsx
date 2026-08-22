@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Pencil, CreditCard, HandCoins, FileText } from 'lucide-react';
+import { Plus, Search, Pencil, CreditCard, HandCoins, FileText, History } from 'lucide-react';
 import { 
   useGetBuyers, 
   getGetBuyersQueryKey, 
   useCreateBuyer, 
   useUpdateBuyer,
-  useCollectBuyerPayment
+  useCollectBuyerPayment,
+  useGetSales,
+  useGetBuyerPayments
 } from '../hooks/useSupabaseData';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -19,9 +21,13 @@ export function Buyers({
   Failed, 
   Empty, 
   money, 
+  timeDate,
   onNavigateToLedger 
 }: any) {
   const q = useGetBuyers({ query: { queryKey: getGetBuyersQueryKey() } });
+  const salesQuery = useGetSales();
+  const buyerPaymentsQuery = useGetBuyerPayments();
+
   const create = useCreateBuyer();
   const update = useUpdateBuyer();
   const collectPayment = useCollectBuyerPayment();
@@ -36,6 +42,9 @@ export function Buyers({
   const [selectedBuyer, setSelectedBuyer] = useState<any>(null);
   const [paymentForm, setPaymentForm] = useState({ amount: '', notes: '', paymentMethod: 'Cash' });
 
+  // History / Ledger Modal State
+  const [historyBuyer, setHistoryBuyer] = useState<any>(null);
+
   const blank = { name: '', phone: '', cnic: '', address: '', creditLimit: '' };
   const [form, setForm] = useState(blank);
 
@@ -48,6 +57,41 @@ export function Buyers({
   const totalReceivables = useMemo(() => {
     return (q.data || []).reduce((acc: number, b: any) => acc + Number(b.currentBalance ?? b.current_balance ?? 0), 0);
   }, [q.data]);
+
+  // Combined ledger history for the selected customer
+  const buyerHistoryRecords = useMemo(() => {
+    if (!historyBuyer) return [];
+
+    const buyerSales = (salesQuery.data || [])
+      .filter((s: any) => String(s.buyerId || s.buyer_id) === String(historyBuyer.id))
+      .map((s: any) => ({
+        id: `sale-${s.id}`,
+        type: 'sale',
+        refNo: s.invoiceNumber || s.invoice_number || `INV-${s.id}`,
+        date: s.created_at || s.transactionTime,
+        debit: Number(s.totalAmount ?? s.total_amount ?? 0),
+        credit: Number(s.paidAmount ?? s.paid_amount ?? 0),
+        status: s.paymentStatus || s.payment_status || 'unpaid',
+        notes: `Sales Invoice (${(s.items || []).length} items)`
+      }));
+
+    const buyerPayments = (buyerPaymentsQuery.data || [])
+      .filter((p: any) => String(p.buyerId || p.buyer_id) === String(historyBuyer.id))
+      .map((p: any) => ({
+        id: `pay-${p.id}`,
+        type: 'payment',
+        refNo: `REC-${p.id}`,
+        date: p.created_at,
+        debit: 0,
+        credit: Number(p.amount || 0),
+        status: 'paid',
+        notes: p.notes || `Udhaar Payment (${p.paymentMethod || p.payment_method || 'Cash'})`
+      }));
+
+    return [...buyerSales, ...buyerPayments].sort((a, b) => {
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+  }, [historyBuyer, salesQuery.data, buyerPaymentsQuery.data]);
 
   const open = (b?: any) => {
     setEditing(b || null);
@@ -69,6 +113,14 @@ export function Buyers({
     setSelectedBuyer(buyer);
     setPaymentForm({ amount: '', notes: 'Udhaar Payment Collected', paymentMethod: 'Cash' });
     setPaymentModal(true);
+  };
+
+  const handleLedgerClick = (buyer: any) => {
+    if (onNavigateToLedger) {
+      onNavigateToLedger(buyer.id);
+    } else {
+      setHistoryBuyer(buyer);
+    }
   };
 
   const submit = (e: React.FormEvent) => {
@@ -199,7 +251,7 @@ export function Buyers({
                       <td className="py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => onNavigateToLedger && onNavigateToLedger(b.id)}
+                            onClick={() => handleLedgerClick(b)}
                             className="inline-flex items-center gap-1 rounded-md bg-muted px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/80"
                             title="View Customer Ledger"
                           >
@@ -244,6 +296,7 @@ export function Buyers({
         )}
       </div>
 
+      {/* Edit/Add Customer Modal */}
       {modal && (
         <Modal title={editing ? 'Edit customer' : 'Add customer'} eyebrow="Customer book" onClose={() => setModal(false)}>
           <form onSubmit={submit} className="grid gap-3">
@@ -314,6 +367,86 @@ export function Buyers({
               {collectPayment.isPending ? 'Processing…' : 'Confirm Payment'}
             </Button>
           </form>
+        </Modal>
+      )}
+
+      {/* Customer Ledger & Payment History Modal */}
+      {historyBuyer && (
+        <Modal
+          title={`${historyBuyer.name} - Statement`}
+          eyebrow="Customer Ledger & Udhaar Repayments"
+          onClose={() => setHistoryBuyer(null)}
+        >
+          <div className="space-y-4 text-sm">
+            <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted p-3 text-xs">
+              <div>
+                <div className="text-muted-foreground">Phone:</div>
+                <div className="font-semibold text-foreground">{historyBuyer.phone || 'N/A'}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Current Outstanding Balance:</div>
+                <div className="font-mono font-bold text-accent">
+                  {money(historyBuyer.currentBalance ?? historyBuyer.current_balance ?? 0)}
+                </div>
+              </div>
+            </div>
+
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Transaction History
+            </div>
+
+            {salesQuery.isLoading || buyerPaymentsQuery.isLoading ? (
+              <Loading />
+            ) : buyerHistoryRecords.length > 0 ? (
+              <div className="max-h-72 overflow-y-auto border-y divide-y divide-border/60">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-muted/40 text-muted-foreground">
+                      <th className="py-2 px-1">Ref #</th>
+                      <th className="py-2 px-1">Date</th>
+                      <th className="py-2 px-1">Description</th>
+                      <th className="py-2 px-1 text-right">Debit (Sale)</th>
+                      <th className="py-2 px-1 text-right">Credit (Paid)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {buyerHistoryRecords.map((rec: any) => (
+                      <tr key={rec.id} className="hover:bg-muted/20">
+                        <td className="py-2 px-1 font-mono font-semibold">{rec.refNo}</td>
+                        <td className="py-2 px-1 text-muted-foreground">{timeDate ? timeDate(rec.date) : rec.date}</td>
+                        <td className="py-2 px-1">
+                          <span
+                            className={`mr-1.5 inline-block rounded px-1.5 py-0.5 text-[9px] font-bold ${
+                              rec.type === 'payment'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}
+                          >
+                            {rec.type === 'payment' ? 'REPAYMENT' : 'SALE'}
+                          </span>
+                          <span className="text-muted-foreground">{rec.notes}</span>
+                        </td>
+                        <td className="py-2 px-1 text-right font-mono text-foreground">
+                          {rec.debit > 0 ? money(rec.debit) : '-'}
+                        </td>
+                        <td className="py-2 px-1 text-right font-mono text-emerald-700 font-semibold">
+                          {rec.credit > 0 ? money(rec.credit) : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="rounded bg-muted/50 p-4 text-center text-xs text-muted-foreground">
+                No past transactions recorded for this buyer yet.
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => setHistoryBuyer(null)}>Close</Button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>
