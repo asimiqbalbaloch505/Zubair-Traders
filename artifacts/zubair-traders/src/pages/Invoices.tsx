@@ -2,7 +2,18 @@ import React, { useState, useMemo } from 'react';
 import { FileText, Printer, Search, Filter, Calendar, X } from 'lucide-react';
 import { useGetSales, useGetBuyerPayments, useGetPurchases } from '../hooks/useSupabaseData';
 
-export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
+interface InvoicesProps {
+  PageIntro: React.ComponentType<any>;
+  Button: React.ComponentType<any>;
+  Modal: React.ComponentType<any>;
+  Loading: React.ComponentType<any>;
+  Failed: React.ComponentType<{ onRetry: () => void }>;
+  Empty: React.ComponentType<{ title: string; detail: string }>;
+  money: (amount: number) => string;
+  timeDate: (date: string | Date) => string;
+}
+
+export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: InvoicesProps) {
   const sales = useGetSales();
   const buyerPayments = useGetBuyerPayments();
   const purchases = useGetPurchases();
@@ -20,6 +31,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
   const combinedRecords = useMemo(() => {
     const salesList = (sales.data || []).map((s: any) => ({
       ...s,
+      uniqueKey: `sale-${s.id}`,
       recordType: 'sales',
       displayType: 'Sales',
     }));
@@ -30,7 +42,8 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
       const amount = Number(p.amount || 0);
 
       return {
-        id: `udhaar-${p.id}`,
+        ...p,
+        uniqueKey: `udhaar-${p.id}`,
         invoiceNumber: recNo,
         invoice_number: recNo,
         buyerName: buyerName,
@@ -59,7 +72,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
 
       return {
         ...pur,
-        id: `purchase-${pur.id}`,
+        uniqueKey: `purchase-${pur.id}`,
         invoiceNumber: purNo,
         invoice_number: purNo,
         buyerName: supplierName,
@@ -221,7 +234,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
 
                   return (
                     <tr
-                      key={inv.id}
+                      key={inv.uniqueKey}
                       onClick={() => setSelectedInvoice(inv)}
                       className="cursor-pointer transition hover:bg-muted/40"
                     >
