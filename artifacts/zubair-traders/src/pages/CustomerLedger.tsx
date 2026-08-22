@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { FileText, Printer, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Plus } from 'lucide-react';
+import { FileText, Printer, Search, Calendar, X, ArrowDownRight, ArrowUpRight, HandBanknote } from 'lucide-react';
 import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
-import { supabase } from '../lib/supabase'; // Using supabase directly to prevent export errors
+import { supabase } from '../lib/supabase';
 
 export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
   const sales = useGetSales();
@@ -11,19 +11,18 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
   const [selectedBuyerId, setSelectedBuyerId] = useState<string>('');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  
+  // Date Presets: 'today' | 'this_month' | 'last_month' | 'this_year' | 'last_year' | 'custom'
+  const [datePreset, setDatePreset] = useState<string>('this_month');
+  const [customDate, setCustomDate] = useState<string>('');
 
-  // Payment Modal & Submitting state
+  // Payment Modal State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
-  const [paymentForm, setPaymentForm] = useState({
-    buyerId: '',
-    amount: '',
-    paymentType: 'partial',
-    notes: '',
-  });
+  const [receiveAmount, setReceiveAmount] = useState<string>('');
+  const [paymentNotes, setPaymentNotes] = useState<string>('');
 
-  // Calculate Ledger Metrics per Buyer
+  // Calculate Base Ledger Metrics per Buyer
   const buyerLedgerData = useMemo(() => {
     if (!buyers.data) return [];
 
@@ -75,17 +74,90 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     });
   }, [buyers.data, sales.data, payments.data]);
 
+  // Selected Active Customer
   const activeBuyer = useMemo(() => {
     if (!selectedBuyerId) return null;
     return buyerLedgerData.find((b: any) => String(b.id) === String(selectedBuyerId)) || null;
   }, [buyerLedgerData, selectedBuyerId]);
 
-  // Combined timeline of Invoices + Payments
-  const transactionsList = useMemo(() => {
-    const targetSales = activeBuyer ? activeBuyer.invoices : (sales.data || []);
-    const targetPayments = activeBuyer ? activeBuyer.payments : (payments.data || []);
+  // Date Filtering Helper
+  const isDateInFilterRange = (itemDateStr: string) => {
+    if (!itemDateStr) return false;
+    const itemDate = new Date(itemDateStr);
+    const now = new Date();
 
-    const invs = targetSales.map((inv: any) => {
+    if (datePreset === 'today') {
+      return itemDate.toDateString() === now.toDateString();
+    }
+
+    if (datePreset === 'this_month') {
+      return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
+    }
+
+    if (datePreset === 'last_month') {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      return (
+        itemDate.getMonth() === lastMonth.getMonth() &&
+        itemDate.getFullYear() === lastMonth.getFullYear()
+      );
+    }
+
+    if (datePreset === 'this_year') {
+      return itemDate.getFullYear() === now.getFullYear();
+    }
+
+    if (datePreset === 'last_year') {
+      return itemDate.getFullYear() === now.getFullYear() - 1;
+    }
+
+    if (datePreset === 'custom' && customDate) {
+      return itemDate.toISOString().split('T')[0] === customDate;
+    }
+
+    return true; // 'all' or fallback
+  };
+
+  // Filtered Raw Sales & Payments (used for Summary Cards & Table)
+  const filteredSales = useMemo(() => {
+    const rawSales = activeBuyer ? activeBuyer.invoices : (sales.data || []);
+    return rawSales.filter((s: any) => isDateInFilterRange(s.created_at || s.transactionTime || s.transaction_time));
+  }, [activeBuyer, sales.data, datePreset, customDate]);
+
+  const filteredPayments = useMemo(() => {
+    const rawPayments = activeBuyer ? activeBuyer.payments : (payments.data || []);
+    return rawPayments.filter((p: any) => isDateInFilterRange(p.created_at || p.payment_date || p.transactionTime));
+  }, [activeBuyer, payments.data, datePreset, customDate]);
+
+  // Dynamically Calculated Metrics based on Customer + Date Filter
+  const summaryMetrics = useMemo(() => {
+    const totalSales = filteredSales.reduce(
+      (sum: number, s: any) => sum + Number(s.totalAmount ?? s.total_amount ?? 0),
+      0
+    );
+
+    const initialDown = filteredSales.reduce(
+      (sum: number, s: any) => sum + Number(s.paidAmount ?? s.paid_amount ?? 0),
+      0
+    );
+
+    const directReceipts = filteredPayments.reduce(
+      (sum: number, p: any) => sum + Number(p.amount ?? p.paid_amount ?? 0),
+      0
+    );
+
+    const totalCollected = initialDown + directReceipts;
+
+    // Udhaar is customer-specific overall balance or total overall
+    const totalUdhaar = activeBuyer
+      ? activeBuyer.totalUdhaar
+      : buyerLedgerData.reduce((acc, b) => acc + b.totalUdhaar, 0);
+
+    return { totalSales, totalCollected, totalUdhaar };
+  }, [filteredSales, filteredPayments, activeBuyer, buyerLedgerData]);
+
+  // Combined Merged Transactions
+  const transactionsList = useMemo(() => {
+    const invs = filteredSales.map((inv: any) => {
       const total = Number(inv.totalAmount ?? inv.total_amount ?? 0);
       const paid = Number(inv.paidAmount ?? inv.paid_amount ?? 0);
       const statusRaw = String(inv.paymentStatus || inv.payment_status || '').toLowerCase();
@@ -111,7 +183,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
       };
     });
 
-    const pmts = targetPayments.map((pmt: any) => ({
+    const pmts = filteredPayments.map((pmt: any) => ({
       id: pmt.id,
       type: 'PAYMENT',
       refNo: pmt.id ? `REC-${pmt.id}` : 'RECEIPT',
@@ -128,91 +200,49 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 
-    return merged.filter((item) => {
-      if (dateFilter) {
-        const itemDateStr = new Date(item.date).toISOString().split('T')[0];
-        if (itemDateStr !== dateFilter) return false;
-      }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return merged.filter(
+        (item) =>
           String(item.refNo).toLowerCase().includes(q) ||
           String(item.buyerName).toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
-  }, [activeBuyer, sales.data, payments.data, dateFilter, searchQuery]);
-
-  const summaryMetrics = useMemo(() => {
-    if (activeBuyer) {
-      return {
-        totalSales: activeBuyer.totalInvoiced,
-        totalCollected: activeBuyer.totalPaid,
-        totalUdhaar: activeBuyer.totalUdhaar,
-      };
+      );
     }
 
-    const totalSales = buyerLedgerData.reduce((acc, b) => acc + b.totalInvoiced, 0);
-    const totalCollected = buyerLedgerData.reduce((acc, b) => acc + b.totalPaid, 0);
-    const totalUdhaar = buyerLedgerData.reduce((acc, b) => acc + b.totalUdhaar, 0);
+    return merged;
+  }, [filteredSales, filteredPayments, activeBuyer, searchQuery]);
 
-    return { totalSales, totalCollected, totalUdhaar };
-  }, [activeBuyer, buyerLedgerData]);
-
-  // Handle Opening Modal
-  const handleOpenPaymentModal = () => {
-    const targetBuyer = activeBuyer || (buyerLedgerData.length > 0 ? buyerLedgerData[0] : null);
-    setPaymentForm({
-      buyerId: selectedBuyerId || (targetBuyer ? String(targetBuyer.id) : ''),
-      amount: targetBuyer ? String(targetBuyer.totalUdhaar || '') : '',
-      paymentType: 'complete',
-      notes: '',
-    });
+  // Open Receive Payment Modal
+  const handleOpenReceivePayment = () => {
+    if (!activeBuyer) return;
+    setReceiveAmount(String(activeBuyer.totalUdhaar || ''));
+    setPaymentNotes('');
     setIsPaymentModalOpen(true);
   };
 
-  const handleModalBuyerChange = (bId: string) => {
-    const buyerObj = buyerLedgerData.find((b: any) => String(b.id) === String(bId));
-    setPaymentForm((prev) => ({
-      ...prev,
-      buyerId: bId,
-      amount: buyerObj ? String(buyerObj.totalUdhaar || '') : prev.amount,
-    }));
-  };
-
-  const handlePaymentTypeChange = (type: string) => {
-    const buyerObj = buyerLedgerData.find((b: any) => String(b.id) === String(paymentForm.buyerId));
-    setPaymentForm((prev) => ({
-      ...prev,
-      paymentType: type,
-      amount: type === 'complete' && buyerObj ? String(buyerObj.totalUdhaar || 0) : prev.amount,
-    }));
-  };
-
-  // Submit Payment directly via Supabase
-  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
+  // Submit Payment Received
+  const handleReceivePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paymentForm.buyerId || !paymentForm.amount || Number(paymentForm.amount) <= 0) return;
+    if (!activeBuyer || !receiveAmount || Number(receiveAmount) <= 0) return;
 
     setIsSubmittingPayment(true);
     try {
       const { error } = await supabase.from('buyer_payments').insert([
         {
-          buyer_id: paymentForm.buyerId,
-          amount: Number(paymentForm.amount),
-          notes: paymentForm.notes,
+          buyer_id: activeBuyer.id,
+          amount: Number(receiveAmount),
+          notes: paymentNotes,
           payment_date: new Date().toISOString(),
         },
       ]);
 
       if (error) throw error;
 
-      // Refetch payment data
       if (payments.refetch) payments.refetch();
+      if (sales.refetch) sales.refetch();
       setIsPaymentModalOpen(false);
     } catch (err) {
-      console.error('Error inserting payment:', err);
+      console.error('Failed to submit payment:', err);
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -229,54 +259,66 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         detail="View customer credit balances, collections history, and itemized invoice details."
       />
 
-      {/* Customer Selector & Payment Action */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div className="w-full sm:w-80">
-          <label className="block text-xs font-semibold text-muted-foreground mb-1">
-            Select Customer
-          </label>
-          <select
-            value={selectedBuyerId}
-            onChange={(e) => setSelectedBuyerId(e.target.value)}
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-xs outline-none focus:border-primary"
-          >
-            <option value="">All Customers</option>
-            {buyerLedgerData.map((b: any) => (
-              <option key={b.id} value={b.id}>
-                {b.name} {b.phone ? `(${b.phone})` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <Button onClick={handleOpenPaymentModal} className="flex items-center gap-1.5">
-          <Plus size={16} /> Record Payment
-        </Button>
+      {/* Select Customer Dropdown */}
+      <div className="w-full sm:w-80">
+        <label className="block text-xs font-semibold text-muted-foreground mb-1">
+          Select Customer
+        </label>
+        <select
+          value={selectedBuyerId}
+          onChange={(e) => setSelectedBuyerId(e.target.value)}
+          className="h-10 w-full rounded-lg border border-input bg-background px-3 text-xs outline-none focus:border-primary font-medium"
+        >
+          <option value="">All Customers</option>
+          {buyerLedgerData.map((b: any) => (
+            <option key={b.id} value={b.id}>
+              {b.name} {b.phone ? `(${b.phone})` : ''}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* Metric Cards */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-4">
-          <span className="text-xs text-muted-foreground">Total Sales</span>
+          <span className="text-xs text-muted-foreground font-semibold">Total Sales</span>
           <div className="mt-1 font-mono text-xl font-bold">{money(summaryMetrics.totalSales)}</div>
         </div>
+
         <div className="rounded-xl border border-border bg-card p-4">
           <span className="text-xs text-muted-foreground font-semibold">Collected</span>
           <div className="mt-1 font-mono text-xl font-bold text-emerald-600">
             {money(summaryMetrics.totalCollected)}
           </div>
         </div>
-        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4">
-          <span className="text-xs text-destructive font-semibold">Udhaar (Balance Due)</span>
-          <div className="mt-1 font-mono text-xl font-bold text-destructive">
-            {money(summaryMetrics.totalUdhaar)}
+
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 flex flex-col justify-between">
+          <div>
+            <span className="text-xs text-destructive font-semibold">Udhaar (Balance Due)</span>
+            <div className="mt-1 font-mono text-xl font-bold text-destructive">
+              {money(summaryMetrics.totalUdhaar)}
+            </div>
           </div>
+
+          {/* Show 'Receive Payment' inside Udhaar card ONLY if a customer is selected & Udhaar > 0 */}
+          {activeBuyer && summaryMetrics.totalUdhaar > 0 && (
+            <div className="mt-3 pt-2 border-t border-destructive/20">
+              <button
+                type="button"
+                onClick={handleOpenReceivePayment}
+                className="w-full py-1.5 px-3 rounded-lg bg-destructive text-destructive-foreground font-semibold text-xs hover:bg-destructive/90 transition flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <HandBanknote size={14} /> Receive Payment
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Search & Filters */}
+      {/* Filter Panel: Search + Date Filters */}
       <div className="panel rounded-xl border border-border/80 p-5 space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          {/* Search Bar */}
           <div className="relative flex-1 max-w-xs">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -284,27 +326,66 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
               placeholder="Search invoice # or customer..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none focus:border-primary"
+              className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none focus:border-primary"
             />
           </div>
 
-          <div className="relative flex items-center">
-            <Calendar size={14} className="absolute left-2.5 text-muted-foreground pointer-events-none" />
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="h-10 rounded-lg border border-input bg-background pl-8 pr-7 text-xs font-semibold outline-none focus:border-primary"
-            />
-            {dateFilter && (
+          {/* Date Filter Bar */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[
+              { id: 'today', label: 'Today' },
+              { id: 'this_month', label: 'This Month' },
+              { id: 'last_month', label: 'Last Month' },
+              { id: 'this_year', label: 'This Year' },
+              { id: 'last_year', label: 'Last Year' },
+              { id: 'all', label: 'All Time' },
+            ].map((preset) => (
               <button
+                key={preset.id}
                 type="button"
-                onClick={() => setDateFilter('')}
-                className="absolute right-2 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setDatePreset(preset.id);
+                  setCustomDate('');
+                }}
+                className={`h-8 px-3 rounded-md text-xs font-semibold transition ${
+                  datePreset === preset.id
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-muted/60 hover:bg-muted text-muted-foreground'
+                }`}
               >
-                <X size={13} />
+                {preset.label}
               </button>
-            )}
+            ))}
+
+            {/* Custom Date Input */}
+            <div className="relative flex items-center ml-1">
+              <Calendar size={13} className="absolute left-2.5 text-muted-foreground pointer-events-none" />
+              <input
+                type="date"
+                value={customDate}
+                onChange={(e) => {
+                  setCustomDate(e.target.value);
+                  setDatePreset('custom');
+                }}
+                className={`h-8 rounded-md border text-xs font-semibold pl-8 pr-2 outline-none ${
+                  datePreset === 'custom'
+                    ? 'border-primary bg-primary/5 text-primary'
+                    : 'border-input bg-background text-muted-foreground'
+                }`}
+              />
+              {customDate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomDate('');
+                    setDatePreset('this_month');
+                  }}
+                  className="ml-1 text-muted-foreground hover:text-foreground"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -379,62 +460,34 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
               </tbody>
             </table>
           ) : (
-            <Empty title="No records found" detail="No sales or payment records match your current criteria." />
+            <Empty title="No records found" detail="No transactions match your current search and date parameters." />
           )}
         </div>
       </div>
 
-      {/* Modal: Record Udhaar Payment */}
-      {isPaymentModalOpen && (
+      {/* Receive Udhaar Payment Modal */}
+      {isPaymentModalOpen && activeBuyer && (
         <Modal
-          title="Record Udhaar Collection"
-          eyebrow="Receive Payment"
+          title={`Receive Udhaar Payment`}
+          eyebrow={activeBuyer.name}
           onClose={() => setIsPaymentModalOpen(false)}
         >
-          <form onSubmit={handleRecordPaymentSubmit} className="space-y-4 text-xs">
-            <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Customer</label>
-              <select
-                value={paymentForm.buyerId}
-                onChange={(e) => handleModalBuyerChange(e.target.value)}
-                required
-                className="h-10 w-full rounded-lg border border-input bg-background px-3 outline-none focus:border-primary"
-              >
-                <option value="" disabled>Select Customer</option>
-                {buyerLedgerData.map((b: any) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name} — (Udhaar: {money(b.totalUdhaar)})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Payment Type</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handlePaymentTypeChange('partial')}
-                  className={`h-9 rounded-lg border font-semibold transition ${
-                    paymentForm.paymentType === 'partial'
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-input hover:bg-muted'
-                  }`}
-                >
-                  Partial Payment
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handlePaymentTypeChange('complete')}
-                  className={`h-9 rounded-lg border font-semibold transition ${
-                    paymentForm.paymentType === 'complete'
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
-                      : 'border-input hover:bg-muted'
-                  }`}
-                >
-                  Complete Payment
-                </button>
+          <form onSubmit={handleReceivePaymentSubmit} className="space-y-4 text-xs">
+            <div className="rounded-lg bg-destructive/10 p-3 border border-destructive/20 flex justify-between items-center">
+              <div>
+                <div className="text-muted-foreground">Current Udhaar Balance</div>
+                <div className="font-mono text-base font-bold text-destructive">
+                  {money(activeBuyer.totalUdhaar)}
+                </div>
               </div>
+              {Number(receiveAmount) > 0 && (
+                <div className="text-right">
+                  <div className="text-muted-foreground">Remaining Balance</div>
+                  <div className="font-mono text-base font-bold text-emerald-600">
+                    {money(Math.max(0, activeBuyer.totalUdhaar - Number(receiveAmount)))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
@@ -442,22 +495,23 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
               <input
                 type="number"
                 min="1"
+                max={activeBuyer.totalUdhaar}
                 step="any"
                 required
-                placeholder="Enter payment amount"
-                value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                placeholder="Enter amount paid by customer"
+                value={receiveAmount}
+                onChange={(e) => setReceiveAmount(e.target.value)}
                 className="h-10 w-full rounded-lg border border-input bg-background px-3 font-mono text-sm outline-none focus:border-primary"
               />
             </div>
 
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Notes / Description (Optional)</label>
+              <label className="block font-semibold text-muted-foreground mb-1">Notes / Remarks (Optional)</label>
               <input
                 type="text"
-                placeholder="e.g. Cash payment / Bank transfer ref"
-                value={paymentForm.notes}
-                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                placeholder="e.g. Received cash / Bank transfer"
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
                 className="h-10 w-full rounded-lg border border-input bg-background px-3 outline-none focus:border-primary"
               />
             </div>
@@ -467,7 +521,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmittingPayment}>
-                {isSubmittingPayment ? 'Saving...' : 'Save Payment'}
+                {isSubmittingPayment ? 'Saving...' : 'Confirm Received Payment'}
               </Button>
             </div>
           </form>
