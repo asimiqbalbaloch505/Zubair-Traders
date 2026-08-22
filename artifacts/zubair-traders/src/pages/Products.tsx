@@ -64,7 +64,7 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
     <div className="animate-in">
       <PageIntro 
         eyebrow="The bake, counted" 
-        title="Products" 
+        title="Stock & Inventory" 
         detail="Inventory with enough signal to keep production moving." 
         action={
           <Button onClick={() => setModal(true)} testId="button-add-product">
