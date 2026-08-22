@@ -22,7 +22,7 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
             unit_cost,
             products (default_purchase_cost)
           )
-        `),
+        `).gt('total_amount', 0), // Filter out zero-amount invoices
         supabase.from('products').select('*'),
         supabase.from('buyers').select('*'),
         supabase.from('suppliers').select('*'),
@@ -229,23 +229,22 @@ export function useUpdateBuyer() {
   });
 }
 
+// Collection Hook: Saves directly to buyer_payments and updates customer balance
 export function useCollectBuyerPayment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ buyerId, amount, notes }: { buyerId: string | number; amount: number; notes?: string }) => {
-      // 1. Create a zero-total sales invoice record representing pure payment receipt
-      const { data: resInvoice, error: invError } = await supabase.from('sales_invoices').insert([{
+    mutationFn: async ({ buyerId, amount, notes, paymentMethod }: { buyerId: string | number; amount: number; notes?: string; paymentMethod?: string }) => {
+      // 1. Insert into buyer_payments table
+      const { data: receipt, error: receiptError } = await supabase.from('buyer_payments').insert([{
         buyer_id: buyerId,
-        total_amount: 0,
-        paid_amount: amount,
-        due_amount: -amount,
-        payment_status: 'PAID',
-        notes: notes || 'Payment Received',
+        amount: amount,
+        payment_method: paymentMethod || 'Cash',
+        notes: notes || 'Udhaar Payment Collected',
       }]).select().single();
 
-      if (invError) throw invError;
+      if (receiptError) throw receiptError;
 
-      // 2. Fetch current balance of the buyer
+      // 2. Fetch current balance of buyer
       const { data: currentBuyer, error: buyerError } = await supabase
         .from('buyers')
         .select('current_balance')
@@ -265,12 +264,33 @@ export function useCollectBuyerPayment() {
 
       if (updateError) throw updateError;
 
-      return resInvoice;
+      return receipt;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['buyers'] });
-      qc.invalidateQueries({ queryKey: ['sales'] });
+      qc.invalidateQueries({ queryKey: ['buyer_payments'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+// Fetch payment history receipts for a specific buyer or all buyers
+export function useGetBuyerPayments(buyerId?: string | number) {
+  return useQuery({
+    queryKey: ['buyer_payments', buyerId],
+    queryFn: async () => {
+      let query = supabase.from('buyer_payments').select(`
+        *,
+        buyers (name)
+      `).order('created_at', { ascending: false });
+
+      if (buyerId) {
+        query = query.eq('buyer_id', buyerId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
     },
   });
 }
@@ -289,6 +309,7 @@ export function useGetSales() {
             products(name)
           )
         `)
+        .gt('total_amount', 0) // Strictly return actual sales invoices (total_amount > 0)
         .order('transaction_time', { ascending: false });
 
       if (error) {
@@ -704,6 +725,7 @@ export function useCreatePurchase() {
 export const getGetDashboardQueryKey = () => ['dashboard'];
 export const getGetBuyersQueryKey = () => ['buyers'];
 export const getGetSalesQueryKey = () => ['sales'];
+export const getGetBuyerPaymentsQueryKey = (buyerId?: string | number) => ['buyer_payments', buyerId];
 export const getGetSuppliersQueryKey = () => ['suppliers'];
 export const getGetProductsQueryKey = () => ['products'];
 export const getGetExpensesQueryKey = () => ['expenses'];
