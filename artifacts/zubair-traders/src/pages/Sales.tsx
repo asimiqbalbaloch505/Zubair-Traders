@@ -162,7 +162,6 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     const prod = products.data?.find((p: any) => String(p.id) === String(selectedProductId));
     if (!prod) return;
 
-    // Correctly resolve stock quantity from all possible prop names
     const availableStock = Number(prod.stockQuantity ?? prod.stock_quantity ?? prod.stock ?? prod.quantity ?? 0);
 
     if (availableStock <= 0) {
@@ -171,8 +170,6 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     }
 
     const requestedQty = Math.max(Number(itemQty) || 1, 1);
-
-    // Check existing qty already in cart
     const existingCartItem = items.find(i => String(i.productId) === String(prod.id));
     const currentCartQty = existingCartItem ? existingCartItem.quantity : 0;
 
@@ -267,7 +264,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     <div className="animate-in">
       <PageIntro eyebrow="Fast lane" title="Make a sale" detail="A clean invoice now means a clean drawer later." />
 
-      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="flex flex-col gap-5">
         <section className="panel rounded-xl p-5">
           <div className="mb-5 flex items-center gap-3">
             <div className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-primary">
