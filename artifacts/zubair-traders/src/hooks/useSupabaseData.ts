@@ -687,7 +687,7 @@ export function useHealthCheck(_options?: any) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ data }: { data: any }) => {
-      // 1. Sanitize supplierId: convert empty string to null or ensure valid ID format
+      // 1. Sanitize supplierId: convert empty string to null
       const rawSupplierId = data.supplierId || data.supplier_id;
       const supplierId = rawSupplierId && String(rawSupplierId).trim() !== '' ? rawSupplierId : null;
 
@@ -704,12 +704,21 @@ export function useHealthCheck(_options?: any) {
       const paid = Number(data.paidAmount ?? data.paid_amount ?? 0);
       const due = Math.max(0, calculatedTotal - paid);
 
-      // 3. Insert purchase invoice
+      // 3. Determine payment_status to satisfy NOT-NULL constraint
+      let paymentStatus = 'DUE';
+      if (paid >= calculatedTotal && calculatedTotal > 0) {
+        paymentStatus = 'PAID';
+      } else if (paid > 0) {
+        paymentStatus = 'PARTIALLY_PAID';
+      }
+
+      // 4. Insert purchase invoice
       const { data: purchase, error: purchaseError } = await supabase.from('purchase_invoices').insert([{
         supplier_id: supplierId,
         total_amount: calculatedTotal,
         paid_amount: paid,
         due_amount: due,
+        payment_status: paymentStatus,
         notes: data.notes || null,
         transaction_time: new Date().toISOString(),
       }]).select().single();
@@ -719,7 +728,7 @@ export function useHealthCheck(_options?: any) {
         throw purchaseError;
       }
 
-      // 4. Insert purchase items and update product stock/pricing
+      // 5. Insert purchase items and update product stock/pricing
       if (data.items && data.items.length > 0) {
         const lineItems = data.items.map((item: any) => {
           const qty = Number(item.quantity || item.qty || 1);
@@ -728,7 +737,6 @@ export function useHealthCheck(_options?: any) {
           
           return {
             purchase_id: purchase.id,
-            // Convert to Number if database primary key is bigint/integer
             product_id: isNaN(Number(rawProdId)) ? rawProdId : Number(rawProdId),
             quantity: qty,
             purchase_cost: cost,
@@ -773,7 +781,7 @@ export function useHealthCheck(_options?: any) {
         }
       }
 
-      // 5. Update Supplier Payable Balance when due balance remains
+      // 6. Update Supplier Payable Balance when due balance remains
       if (supplierId && due > 0) {
         const { data: currentSupplier, error: supplierErr } = await supabase
           .from('suppliers')
