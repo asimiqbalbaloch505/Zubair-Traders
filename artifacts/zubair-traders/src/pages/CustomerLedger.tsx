@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { FileText, Printer, Search, Calendar, X, ArrowDownRight, ArrowUpRight, HandBanknote } from 'lucide-react';
+import { FileText, Printer, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Banknote } from 'lucide-react';
 import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
 import { supabase } from '../lib/supabase';
 
@@ -12,7 +12,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Date Presets: 'today' | 'this_month' | 'last_month' | 'this_year' | 'last_year' | 'custom'
+  // Date Presets: 'today' | 'this_month' | 'last_month' | 'this_year' | 'last_year' | 'custom' | 'all'
   const [datePreset, setDatePreset] = useState<string>('this_month');
   const [customDate, setCustomDate] = useState<string>('');
 
@@ -286,7 +286,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         </div>
 
         <div className="rounded-xl border border-border bg-card p-4">
-          <span className="text-xs text-muted-foreground font-semibold">Collected</span>
+          <span className="text-xs text-muted-foreground font-semibold font-semibold">Collected</span>
           <div className="mt-1 font-mono text-xl font-bold text-emerald-600">
             {money(summaryMetrics.totalCollected)}
           </div>
@@ -308,7 +308,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                 onClick={handleOpenReceivePayment}
                 className="w-full py-1.5 px-3 rounded-lg bg-destructive text-destructive-foreground font-semibold text-xs hover:bg-destructive/90 transition flex items-center justify-center gap-1.5 shadow-sm"
               >
-                <HandBanknote size={14} /> Receive Payment
+                <Banknote size={14} /> Receive Payment
               </button>
             </div>
           )}
