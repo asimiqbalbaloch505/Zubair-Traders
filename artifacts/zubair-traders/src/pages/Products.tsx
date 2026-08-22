@@ -1,19 +1,29 @@
 import React, { useState } from 'react';
-import { Plus, PackagePlus, AlertTriangle } from 'lucide-react';
+import { Plus, PackagePlus, AlertTriangle, RefreshCw } from 'lucide-react';
 import { 
   useGetProducts, 
   getGetProductsQueryKey, 
-  useCreateProduct 
+  useCreateProduct,
+  useGetSuppliers,
+  useCreatePurchase,
+  getGetSuppliersQueryKey
 } from '../hooks/useSupabaseData';
 import { useQueryClient } from '@tanstack/react-query';
 
 export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Empty, money }: any) {
-  const q = useGetProducts({ query: { queryKey: getGetProductsQueryKey() } });
-  const create = useCreateProduct();
   const qc = useQueryClient();
+  const q = useGetProducts({ query: { queryKey: getGetProductsQueryKey() } });
+  const suppliersQuery = useGetSuppliers({ query: { queryKey: getGetSuppliersQueryKey() } });
+  
+  const createProduct = useCreateProduct();
+  const createPurchase = useCreatePurchase();
 
-  const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({
+  // Modal States
+  const [addProductModal, setAddProductModal] = useState(false);
+  const [restockModal, setRestockModal] = useState(false);
+
+  // Form State for Add Product
+  const [productForm, setProductForm] = useState({
     name: '',
     unit: 'pcs',
     purchaseCost: '',
@@ -22,23 +32,64 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
     minStockAlert: ''
   });
 
-  const submit = (e: React.FormEvent) => {
+  // Form State for Restock
+  const [restockForm, setRestockForm] = useState({
+    supplierId: '',
+    productId: '',
+    purchaseCost: '',
+    sellingPrice: '',
+    quantity: '',
+    paidAmount: '',
+    notes: ''
+  });
+
+  // Handle Product Select in Restock Modal (Pre-fills default prices)
+  const handleSelectProductForRestock = (productId: string) => {
+    const selectedProd = q.data?.find((p: any) => String(p.id) === String(productId));
+    if (selectedProd) {
+      setRestockForm(prev => ({
+        ...prev,
+        productId,
+        purchaseCost: String(selectedProd.purchaseCost ?? ''),
+        sellingPrice: String(selectedProd.sellingPrice ?? '')
+      }));
+    } else {
+      setRestockForm(prev => ({ ...prev, productId }));
+    }
+  };
+
+  // Open Restock Modal directly for a specific row item
+  const openRestockForProduct = (product: any) => {
+    setRestockForm({
+      supplierId: suppliersQuery.data?.[0]?.id || '',
+      productId: String(product.id),
+      purchaseCost: String(product.purchaseCost ?? ''),
+      sellingPrice: String(product.sellingPrice ?? ''),
+      quantity: '',
+      paidAmount: '',
+      notes: ''
+    });
+    setRestockModal(true);
+  };
+
+  // Handle Add Product Submission
+  const handleAddProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    create.mutate(
+    createProduct.mutate(
       {
         data: {
-          ...form,
-          purchaseCost: Number(form.purchaseCost),
-          sellingPrice: Number(form.sellingPrice),
-          stockQuantity: Number(form.stockQuantity),
-          minStockAlert: Number(form.minStockAlert)
+          ...productForm,
+          purchaseCost: Number(productForm.purchaseCost),
+          sellingPrice: Number(productForm.sellingPrice),
+          stockQuantity: Number(productForm.stockQuantity || 0),
+          minStockAlert: Number(productForm.minStockAlert || 5)
         }
       },
       {
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getGetProductsQueryKey() });
-          setModal(false);
-          setForm({
+          setAddProductModal(false);
+          setProductForm({
             name: '',
             unit: 'pcs',
             purchaseCost: '',
@@ -51,8 +102,53 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
     );
   };
 
+  // Handle Restock Submission
+  const handleRestockSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const qty = Number(restockForm.quantity);
+    const cost = Number(restockForm.purchaseCost);
+    const sell = Number(restockForm.sellingPrice);
+    const totalAmount = qty * cost;
+    const paidAmount = Number(restockForm.paidAmount || 0);
+
+    createPurchase.mutate(
+      {
+        data: {
+          supplierId: restockForm.supplierId,
+          totalAmount,
+          paidAmount,
+          notes: restockForm.notes || 'Stock Restock',
+          items: [
+            {
+              productId: restockForm.productId,
+              quantity: qty,
+              unitCost: cost,
+              unitPrice: sell,
+              subtotal: totalAmount
+            }
+          ]
+        }
+      },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetProductsQueryKey() });
+          setRestockModal(false);
+          setRestockForm({
+            supplierId: '',
+            productId: '',
+            purchaseCost: '',
+            sellingPrice: '',
+            quantity: '',
+            paidAmount: '',
+            notes: ''
+          });
+        }
+      }
+    );
+  };
+
   const totalStockValue = q.data?.reduce(
-    (a: number, p: any) => a + p.stockQuantity * p.purchaseCost, 
+    (a: number, p: any) => a + (p.stockQuantity || 0) * (p.purchaseCost || 0), 
     0
   );
 
@@ -67,9 +163,14 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
         title="Stock & Inventory" 
         detail="Inventory with enough signal to keep production moving." 
         action={
-          <Button onClick={() => setModal(true)} testId="button-add-product">
-            <PackagePlus size={16} /> Add product
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setRestockModal(true)} variant="outline" testId="button-restock-stock">
+              <RefreshCw size={16} /> Restock
+            </Button>
+            <Button onClick={() => setAddProductModal(true)} testId="button-add-product">
+              <PackagePlus size={16} /> Add product
+            </Button>
+          </div>
         } 
       />
 
@@ -103,6 +204,7 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
                 <th className="pb-3">Sell</th>
                 <th className="pb-3">Stock</th>
                 <th className="pb-3">Signal</th>
+                <th className="pb-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/70">
@@ -124,6 +226,16 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
                         <span className="text-xs font-semibold text-emerald-700">Healthy</span>
                       )}
                     </td>
+                    <td className="py-3 text-right">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => openRestockForProduct(p)}
+                        testId={`button-restock-${p.id}`}
+                      >
+                        <RefreshCw size={13} className="mr-1 inline" /> Restock
+                      </Button>
+                    </td>
                   </tr>
                 );
               })}
@@ -134,7 +246,7 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
             title="No products in the catalog" 
             detail="Add the things that come out of your ovens and off your shelves." 
             action={
-              <Button onClick={() => setModal(true)} testId="button-empty-add-product">
+              <Button onClick={() => setAddProductModal(true)} testId="button-empty-add-product">
                 <Plus size={15} /> Add product
               </Button>
             } 
@@ -142,29 +254,30 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
         )}
       </div>
 
-      {modal && (
-        <Modal title="Add product" eyebrow="Product catalog" onClose={() => setModal(false)}>
-          <form onSubmit={submit} className="grid gap-3">
+      {/* Add Product Modal */}
+      {addProductModal && (
+        <Modal title="Add product" eyebrow="Product catalog" onClose={() => setAddProductModal(false)}>
+          <form onSubmit={handleAddProductSubmit} className="grid gap-3">
             <Field 
               label="Product name" 
               name="product-name" 
-              value={form.name} 
-              onChange={(v: string) => setForm({ ...form, name: v })} 
+              value={productForm.name} 
+              onChange={(v: string) => setProductForm({ ...productForm, name: v })} 
               required 
             />
             <div className="grid grid-cols-2 gap-3">
               <Field 
                 label="Unit" 
                 name="product-unit" 
-                value={form.unit} 
-                onChange={(v: string) => setForm({ ...form, unit: v })} 
+                value={productForm.unit} 
+                onChange={(v: string) => setProductForm({ ...productForm, unit: v })} 
               />
               <Field 
                 label="Opening stock" 
                 name="product-stock" 
                 type="number" 
-                value={form.stockQuantity} 
-                onChange={(v: string) => setForm({ ...form, stockQuantity: v })} 
+                value={productForm.stockQuantity} 
+                onChange={(v: string) => setProductForm({ ...productForm, stockQuantity: v })} 
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -172,16 +285,16 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
                 label="Purchase cost" 
                 name="product-cost" 
                 type="number" 
-                value={form.purchaseCost} 
-                onChange={(v: string) => setForm({ ...form, purchaseCost: v })} 
+                value={productForm.purchaseCost} 
+                onChange={(v: string) => setProductForm({ ...productForm, purchaseCost: v })} 
                 required 
               />
               <Field 
                 label="Selling price" 
                 name="product-price" 
                 type="number" 
-                value={form.sellingPrice} 
-                onChange={(v: string) => setForm({ ...form, sellingPrice: v })} 
+                value={productForm.sellingPrice} 
+                onChange={(v: string) => setProductForm({ ...productForm, sellingPrice: v })} 
                 required 
               />
             </div>
@@ -189,12 +302,101 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
               label="Low stock alert at" 
               name="product-alert" 
               type="number" 
-              value={form.minStockAlert} 
-              onChange={(v: string) => setForm({ ...form, minStockAlert: v })} 
+              value={productForm.minStockAlert} 
+              onChange={(v: string) => setProductForm({ ...productForm, minStockAlert: v })} 
               required 
             />
-            <Button type="submit" disabled={create.isPending} testId="button-save-product">
-              {create.isPending ? 'Saving…' : 'Save product'}
+            <Button type="submit" disabled={createProduct.isPending} testId="button-save-product">
+              {createProduct.isPending ? 'Saving…' : 'Save product'}
+            </Button>
+          </form>
+        </Modal>
+      )}
+
+      {/* Restock Modal */}
+      {restockModal && (
+        <Modal title="Restock Product" eyebrow="Inventory Management" onClose={() => setRestockModal(false)}>
+          <form onSubmit={handleRestockSubmit} className="grid gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Supplier</label>
+              <select 
+                className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+                value={restockForm.supplierId}
+                onChange={(e) => setRestockForm({ ...restockForm, supplierId: e.target.value })}
+                required
+              >
+                <option value="">Select Supplier</option>
+                {suppliersQuery.data?.map((sup: any) => (
+                  <option key={sup.id} value={sup.id}>
+                    {sup.name} {sup.companyName ? `(${sup.companyName})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Product</label>
+              <select 
+                className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+                value={restockForm.productId}
+                onChange={(e) => handleSelectProductForRestock(e.target.value)}
+                required
+              >
+                <option value="">Select Product</option>
+                {q.data?.map((prod: any) => (
+                  <option key={prod.id} value={prod.id}>
+                    {prod.name} (Current Stock: {prod.stockQuantity})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field 
+                label="Restock Quantity" 
+                name="restock-qty" 
+                type="number" 
+                value={restockForm.quantity} 
+                onChange={(v: string) => setRestockForm({ ...restockForm, quantity: v })} 
+                required 
+              />
+              <Field 
+                label="Purchase Cost (PKR)" 
+                name="restock-cost" 
+                type="number" 
+                value={restockForm.purchaseCost} 
+                onChange={(v: string) => setRestockForm({ ...restockForm, purchaseCost: v })} 
+                required 
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field 
+                label="Selling Price (PKR)" 
+                name="restock-sell" 
+                type="number" 
+                value={restockForm.sellingPrice} 
+                onChange={(v: string) => setRestockForm({ ...restockForm, sellingPrice: v })} 
+                required 
+              />
+              <Field 
+                label="Amount Paid to Supplier" 
+                name="restock-paid" 
+                type="number" 
+                value={restockForm.paidAmount} 
+                onChange={(v: string) => setRestockForm({ ...restockForm, paidAmount: v })} 
+              />
+            </div>
+
+            <Field 
+              label="Notes" 
+              name="restock-notes" 
+              value={restockForm.notes} 
+              onChange={(v: string) => setRestockForm({ ...restockForm, notes: v })} 
+            />
+
+            <Button type="submit" disabled={createPurchase.isPending} testId="button-save-restock">
+              {createPurchase.isPending ? 'Processing...' : 'Confirm Restock'}
             </Button>
           </form>
         </Modal>

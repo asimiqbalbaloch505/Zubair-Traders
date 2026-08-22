@@ -726,6 +726,8 @@ export function useCreatePurchase() {
         for (const item of data.items) {
           const prodId = item.productId || item.product_id;
           const qtyPurchased = Number(item.quantity || item.qty || 1);
+          const newCost = Number(item.unitCost || item.purchase_cost || 0);
+          const newSell = Number(item.unitPrice || item.unit_price || 0);
 
           const { data: currentProd, error: prodErr } = await supabase
             .from('products')
@@ -737,9 +739,15 @@ export function useCreatePurchase() {
 
           if (currentProd) {
             const newStock = Number(currentProd.stock_quantity || 0) + qtyPurchased;
+            
+            // Build stock and default prices update payload
+            const updatePayload: any = { stock_quantity: newStock };
+            if (newCost > 0) updatePayload.default_purchase_cost = newCost;
+            if (newSell > 0) updatePayload.default_selling_price = newSell;
+
             const { error: updateStockErr } = await supabase
               .from('products')
-              .update({ stock_quantity: newStock })
+              .update(updatePayload)
               .eq('id', prodId);
 
             if (updateStockErr) throw updateStockErr;
