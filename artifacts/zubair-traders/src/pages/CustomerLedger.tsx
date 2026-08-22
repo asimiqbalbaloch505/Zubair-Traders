@@ -1,56 +1,56 @@
 import React, { useState, useMemo } from 'react';
-import { FileText, Printer, Search, Plus, Calendar, X, CreditCard, ArrowDownRight, ArrowUpRight } from 'lucide-react';
-import { useGetSales, useGetCustomers, useGetPayments } from '../hooks/useSupabaseData';
+import { FileText, Printer, Search, Calendar, X, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
 
 export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
   const sales = useGetSales();
-  const customers = useGetCustomers();
-  const payments = useGetPayments(); // Fetch debt/collection payments
+  const buyers = useGetBuyers();
+  const payments = useGetBuyerPayments();
 
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [selectedBuyerId, setSelectedBuyerId] = useState<string | number>('');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');
 
-  // 1. Calculate Ledger Metrics per Customer
-  const customerLedgerData = useMemo(() => {
-    if (!customers.data) return [];
+  // 1. Calculate Ledger Metrics per Buyer
+  const buyerLedgerData = useMemo(() => {
+    if (!buyers.data) return [];
 
     const salesData = sales.data || [];
     const paymentData = payments.data || [];
 
-    return customers.data.map((cust: any) => {
-      const custId = cust.id;
-      const custName = cust.name || cust.customer_name || '';
+    return buyers.data.map((buyer: any) => {
+      const buyerId = buyer.id;
+      const buyerName = buyer.name || '';
 
-      // Get all sales invoices associated with this customer
-      const custSales = salesData.filter(
+      // Get all sales invoices associated with this buyer
+      const buyerSales = salesData.filter(
         (s: any) =>
-          String(s.customerId || s.customer_id) === String(custId) ||
-          String(s.buyerName || s.buyer_name).toLowerCase() === custName.toLowerCase()
+          String(s.buyer_id || s.buyerId) === String(buyerId) ||
+          String(s.buyerName || s.buyer_name).toLowerCase() === buyerName.toLowerCase()
       );
 
-      // Get all collection payments received from this customer
-      const custPayments = paymentData.filter(
+      // Get all collection payments received from this buyer
+      const buyerPayments = paymentData.filter(
         (p: any) =>
-          String(p.customerId || p.customer_id) === String(custId) ||
-          String(p.customerName || p.customer_name).toLowerCase() === custName.toLowerCase()
+          String(p.buyer_id || p.buyerId) === String(buyerId) ||
+          String(p.buyers?.name || p.buyer_name).toLowerCase() === buyerName.toLowerCase()
       );
 
       // Aggregate Total Invoiced Amount
-      const totalInvoiced = custSales.reduce(
+      const totalInvoiced = buyerSales.reduce(
         (sum: number, s: any) => sum + Number(s.totalAmount ?? s.total_amount ?? 0),
         0
       );
 
       // Initial down payments made at invoice creation time
-      const initialDownPayments = custSales.reduce(
+      const initialDownPayments = buyerSales.reduce(
         (sum: number, s: any) => sum + Number(s.paidAmount ?? s.paid_amount ?? 0),
         0
       );
 
       // Total collections recorded in debt receipts
-      const directReceipts = custPayments.reduce(
+      const directReceipts = buyerPayments.reduce(
         (sum: number, p: any) => sum + Number(p.amount ?? p.paid_amount ?? 0),
         0
       );
@@ -59,33 +59,33 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
       const totalUdhaar = Math.max(0, totalInvoiced - totalPaid);
 
       return {
-        ...cust,
+        ...buyer,
         totalInvoiced,
         totalPaid,
         totalUdhaar,
-        invoices: custSales,
-        payments: custPayments,
+        invoices: buyerSales,
+        payments: buyerPayments,
       };
     });
-  }, [customers.data, sales.data, payments.data]);
+  }, [buyers.data, sales.data, payments.data]);
 
-  // Selected customer object
-  const activeCustomer = useMemo(() => {
-    if (!selectedCustomerId) return null;
-    return customerLedgerData.find((c: any) => String(c.id) === String(selectedCustomerId)) || null;
-  }, [customerLedgerData, selectedCustomerId]);
+  // Selected buyer object
+  const activeBuyer = useMemo(() => {
+    if (!selectedBuyerId) return null;
+    return buyerLedgerData.find((b: any) => String(b.id) === String(selectedBuyerId)) || null;
+  }, [buyerLedgerData, selectedBuyerId]);
 
   // Unified Transaction History Timeline (Invoices + Payments)
-  const customerTransactions = useMemo(() => {
-    if (!activeCustomer) return [];
+  const buyerTransactions = useMemo(() => {
+    if (!activeBuyer) return [];
 
-    const invs = activeCustomer.invoices.map((inv: any) => {
+    const invs = activeBuyer.invoices.map((inv: any) => {
       const total = Number(inv.totalAmount ?? inv.total_amount ?? 0);
       const paid = Number(inv.paidAmount ?? inv.paid_amount ?? 0);
       const statusRaw = String(inv.paymentStatus || inv.payment_status || '').toLowerCase();
 
       let status = 'unpaid';
-      if (statusRaw === 'paid' || paid >= total) {
+      if (statusRaw === 'paid' || (total > 0 && paid >= total)) {
         status = 'paid';
       } else if (statusRaw === 'partial' || statusRaw === 'partially_paid' || paid > 0) {
         status = 'partial';
@@ -95,7 +95,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         id: inv.id,
         type: 'INVOICE',
         refNo: inv.invoiceNumber || inv.invoice_number || inv.id,
-        date: inv.created_at || inv.transactionTime,
+        date: inv.created_at || inv.transactionTime || inv.transaction_time,
         amount: total,
         paidAmount: paid,
         dueAmount: Math.max(0, total - paid),
@@ -104,10 +104,10 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
       };
     });
 
-    const pmts = activeCustomer.payments.map((pmt: any) => ({
+    const pmts = activeBuyer.payments.map((pmt: any) => ({
       id: pmt.id,
       type: 'PAYMENT',
-      refNo: pmt.receiptNumber || pmt.receipt_number || pmt.id,
+      refNo: pmt.id ? `REC-${pmt.id}` : 'RECEIPT',
       date: pmt.created_at || pmt.payment_date || pmt.transactionTime,
       amount: Number(pmt.amount ?? pmt.paid_amount ?? 0),
       paidAmount: Number(pmt.amount ?? pmt.paid_amount ?? 0),
@@ -132,21 +132,21 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
       }
       return true;
     });
-  }, [activeCustomer, dateFilter, searchQuery]);
+  }, [activeBuyer, dateFilter, searchQuery]);
 
-  // Filtered customer directory list for search input
-  const filteredCustomers = useMemo(() => {
-    if (!searchQuery.trim()) return customerLedgerData;
+  // Filtered buyers directory list
+  const filteredBuyers = useMemo(() => {
+    if (!searchQuery.trim()) return buyerLedgerData;
     const q = searchQuery.toLowerCase();
-    return customerLedgerData.filter(
-      (c: any) =>
-        String(c.name || '').toLowerCase().includes(q) ||
-        String(c.phone || '').includes(q)
+    return buyerLedgerData.filter(
+      (b: any) =>
+        String(b.name || '').toLowerCase().includes(q) ||
+        String(b.phone || '').includes(q)
     );
-  }, [customerLedgerData, searchQuery]);
+  }, [buyerLedgerData, searchQuery]);
 
-  if (customers.isLoading || sales.isLoading) return <Loading />;
-  if (customers.isError || sales.isError) return <Failed onRetry={() => customers.refetch()} />;
+  if (buyers.isLoading || sales.isLoading) return <Loading />;
+  if (buyers.isError || sales.isError) return <Failed onRetry={() => buyers.refetch()} />;
 
   return (
     <div className="animate-in space-y-6">
@@ -156,15 +156,15 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         detail="Track customer credit balances, payment collection history, and detailed sales statements."
       />
 
-      {/* Customer Selection Card Grid */}
-      {!selectedCustomerId ? (
+      {/* Buyer Selection Card Grid */}
+      {!selectedBuyerId ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="relative flex-1 max-w-xs">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search customer by name or phone..."
+                placeholder="Search buyer by name or phone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none focus:border-primary"
@@ -172,69 +172,69 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
             </div>
           </div>
 
-          {filteredCustomers.length > 0 ? (
+          {filteredBuyers.length > 0 ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredCustomers.map((cust: any) => (
+              {filteredBuyers.map((buyer: any) => (
                 <div
-                  key={cust.id}
-                  onClick={() => setSelectedCustomerId(cust.id)}
+                  key={buyer.id}
+                  onClick={() => setSelectedBuyerId(buyer.id)}
                   className="group cursor-pointer rounded-xl border border-border/80 bg-card p-4 transition-all hover:border-primary hover:shadow-md"
                 >
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-foreground group-hover:text-primary">
-                      {cust.name || cust.customer_name}
+                      {buyer.name}
                     </h3>
-                    <span className="text-xs text-muted-foreground">{cust.phone || 'No Phone'}</span>
+                    <span className="text-xs text-muted-foreground">{buyer.phone || 'No Phone'}</span>
                   </div>
 
                   <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3 text-xs">
                     <div>
                       <span className="block text-muted-foreground">Total Dues</span>
                       <span className="font-mono font-bold text-destructive">
-                        {money(cust.totalUdhaar)}
+                        {money(buyer.totalUdhaar)}
                       </span>
                     </div>
                     <div>
                       <span className="block text-muted-foreground">Total Invoiced</span>
-                      <span className="font-mono font-semibold">{money(cust.totalInvoiced)}</span>
+                      <span className="font-mono font-semibold">{money(buyer.totalInvoiced)}</span>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <Empty title="No customers found" detail="No party accounts match your current query." />
+            <Empty title="No buyers found" detail="No party accounts match your current query." />
           )}
         </div>
       ) : (
         /* Detailed Individual Ledger View */
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <Button variant="outline" onClick={() => setSelectedCustomerId('')}>
-              ← Back to All Customers
+            <Button variant="outline" onClick={() => setSelectedBuyerId('')}>
+              ← Back to All Buyers
             </Button>
             <div className="text-right">
-              <h2 className="text-lg font-bold">{activeCustomer?.name || activeCustomer?.customer_name}</h2>
-              <p className="text-xs text-muted-foreground">{activeCustomer?.phone || 'No Contact Details'}</p>
+              <h2 className="text-lg font-bold">{activeBuyer?.name}</h2>
+              <p className="text-xs text-muted-foreground">{activeBuyer?.phone || 'No Contact Details'}</p>
             </div>
           </div>
 
-          {/* Customer Summary Cards */}
+          {/* Buyer Summary Cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-border bg-card p-4">
               <span className="text-xs text-muted-foreground">Total Sales Invoiced</span>
-              <div className="mt-1 font-mono text-xl font-bold">{money(activeCustomer?.totalInvoiced || 0)}</div>
+              <div className="mt-1 font-mono text-xl font-bold">{money(activeBuyer?.totalInvoiced || 0)}</div>
             </div>
             <div className="rounded-xl border border-border bg-card p-4">
               <span className="text-xs text-muted-foreground">Total Payments Received</span>
               <div className="mt-1 font-mono text-xl font-bold text-emerald-600">
-                {money(activeCustomer?.totalPaid || 0)}
+                {money(activeBuyer?.totalPaid || 0)}
               </div>
             </div>
             <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4">
               <span className="text-xs text-destructive">Current Udhaar (Balance Due)</span>
               <div className="mt-1 font-mono text-xl font-bold text-destructive">
-                {money(activeCustomer?.totalUdhaar || 0)}
+                {money(activeBuyer?.totalUdhaar || 0)}
               </div>
             </div>
           </div>
@@ -274,7 +274,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
             </div>
 
             <div className="overflow-x-auto">
-              {customerTransactions.length > 0 ? (
+              {buyerTransactions.length > 0 ? (
                 <table className="w-full min-w-[600px] text-left text-sm">
                   <thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
                     <tr>
@@ -288,7 +288,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/70">
-                    {customerTransactions.map((tx: any) => (
+                    {buyerTransactions.map((tx: any) => (
                       <tr
                         key={tx.id}
                         onClick={() => tx.type === 'INVOICE' && setSelectedInvoice(tx.raw)}
