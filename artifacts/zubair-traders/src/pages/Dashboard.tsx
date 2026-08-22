@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Banknote, TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, FileText, CircleDollarSign, Receipt } from 'lucide-react';
-import { Link } from 'wouter';
 import { useGetDashboard } from '../hooks/useSupabaseData';
 
-export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money }: any) {
+export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money, onNavigate }: any) {
   const [filter, setFilter] = useState<string>('this_week');
   const q = useGetDashboard(filter);
 
@@ -83,7 +82,14 @@ export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money }: an
         <section className="panel rounded-xl p-5">
           <div className="flex items-start justify-between">
             <div><h3 className="font-bold">Low stock watch</h3><p className="mt-1 text-xs text-muted-foreground">Restock before running out</p></div>
-            <Link href="/products" data-testid="link-view-stock" className="text-xs font-bold text-primary hover:underline">View stock</Link>
+            <button 
+              type="button" 
+              onClick={() => onNavigate?.('products')} 
+              data-testid="link-view-stock" 
+              className="text-xs font-bold text-primary hover:underline cursor-pointer"
+            >
+              View stock
+            </button>
           </div>
           <div className="mt-5 grid gap-1">
             {d?.lowStock?.length ? d.lowStock.map((p: any) => (

@@ -174,7 +174,7 @@ function MainApp() {
     { id: 'sales', label: 'Sales', icon: ShoppingCart },
     { id: 'invoices', label: 'Invoices', icon: FileText },
     { id: 'buyers', label: 'Buyers', icon: Users },
-    { id: 'products', label: 'Products', icon: Package },
+    { id: 'products', label: 'Stock', icon: Package },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
     { id: 'expenses', label: 'Expenses', icon: Wallet },
     { id: 'loans', label: 'Loans', icon: HandCoins },
@@ -253,7 +253,7 @@ function MainApp() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        {activeTab === 'dashboard' && <Dashboard {...commonProps} />}
+        {activeTab === 'dashboard' && <Dashboard {...commonProps} onNavigate={setActiveTab} />}
         {activeTab === 'sales' && <Sales {...commonProps} />}
         {activeTab === 'invoices' && <Invoices {...commonProps} />}
         {activeTab === 'buyers' && <Buyers {...commonProps} />}
