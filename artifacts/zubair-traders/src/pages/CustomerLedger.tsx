@@ -232,7 +232,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
           buyer_id: activeBuyer.id,
           amount: Number(receiveAmount),
           notes: paymentNotes,
-          payment_date: new Date().toISOString(),
+          created_at: new Date().toISOString(),
         },
       ]);
 
@@ -286,7 +286,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         </div>
 
         <div className="rounded-xl border border-border bg-card p-4">
-          <span className="text-xs text-muted-foreground font-semibold font-semibold">Collected</span>
+          <span className="text-xs text-muted-foreground font-semibold">Collected</span>
           <div className="mt-1 font-mono text-xl font-bold text-emerald-600">
             {money(summaryMetrics.totalCollected)}
           </div>
