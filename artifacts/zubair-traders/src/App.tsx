@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { 
   ShoppingCart, Users, Package, Truck, Wallet, 
   HandCoins, BarChart2, LayoutDashboard, Loader2, AlertCircle, Inbox, X,
-  TrendingUp, TrendingDown, FileText
+  TrendingUp, TrendingDown, FileText, Banknote, ArrowUpRight, ArrowDownRight, CircleDollarSign, Receipt
 } from 'lucide-react';
 
 import { Sales } from './pages/Sales';
@@ -14,7 +14,7 @@ import { Expenses } from './pages/Expenses';
 import { Loans } from './pages/Loans';
 import { Reports } from './pages/Reports';
 import { Invoices } from './pages/Invoices';
-import { useGetDashboard } from './hooks/useSupabaseData';
+import { Dashboard } from './pages/dashboard';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,6 +54,27 @@ function PageIntro({ eyebrow, title, detail, action }: any) {
         {detail && <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>}
       </div>
       {action && <div>{action}</div>}
+    </div>
+  );
+}
+
+function Stat({ label, value, icon: Icon, tone = 'default' }: any) {
+  const tones: Record<string, string> = {
+    default: 'text-foreground',
+    warning: 'text-amber-500',
+    accent: 'text-emerald-600',
+    destructive: 'text-red-600',
+  };
+
+  return (
+    <div className="panel rounded-xl p-4 border border-border/80 shadow-xs">
+      <div className="flex items-center justify-between text-muted-foreground">
+        <span className="text-xs font-bold uppercase tracking-wider">{label}</span>
+        {Icon && <Icon size={18} className={tones[tone] || tones.default} />}
+      </div>
+      <div className={`mt-2 font-mono text-2xl font-bold ${tones[tone] || tones.default}`}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -145,169 +166,6 @@ function Empty({ title, detail, action }: any) {
   );
 }
 
-function DashboardOverview({ money, navigate }: any) {
-  const [filter, setFilter] = useState<string>('this_month');
-  const [customMonth, setCustomMonth] = useState<string>('');
-
-  const dash = useGetDashboard(filter, customMonth);
-
-  if (dash.isLoading) return <Loading />;
-  if (dash.isError) return <Failed onRetry={() => dash.refetch()} />;
-
-  const data = dash.data || {};
-  const netProfit = Number(data.netProfit || 0);
-  const isProfitable = netProfit >= 0;
-  const trend = data.salesTrend || [];
-  const maxTrendValue = Math.max(...trend.map((p: any) => p.value), 1000);
-
-  return (
-    <div className="space-y-6 animate-in">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <PageIntro 
-          eyebrow="Operations summary" 
-          title="Dashboard" 
-          detail="Zubair Traders cash position, sales volume, and quick actions." 
-        />
-
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="h-10 rounded-lg border border-input bg-background px-3 text-xs font-semibold text-foreground outline-none focus:border-foreground shadow-xs"
-          >
-            <option value="this_month">This Month</option>
-            <option value="today">Today</option>
-            <option value="this_week">This Week</option>
-            <option value="last_month">Last Month</option>
-            <option value="this_year">This Year</option>
-            <option value="all_time">All Time</option>
-            <option value="custom_month">Select Specific Month...</option>
-          </select>
-
-          {filter === 'custom_month' && (
-            <input
-              type="month"
-              value={customMonth}
-              onChange={(e) => setCustomMonth(e.target.value)}
-              className="h-10 rounded-lg border border-input bg-background px-3 text-xs font-medium text-foreground outline-none focus:border-foreground"
-            />
-          )}
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="panel cursor-pointer rounded-xl p-4 border border-border/80 transition hover:border-foreground/40" onClick={() => navigate('sales')}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase text-muted-foreground">Total Sales</span>
-            <span className="h-2 w-2 rounded-full bg-foreground"></span>
-          </div>
-          <div className="mt-2 font-mono text-2xl font-bold text-foreground">{money(data.totalSales || 0)}</div>
-        </div>
-
-        <div className="panel cursor-pointer rounded-xl p-4 border border-border/80 transition hover:border-foreground/40" onClick={() => navigate('buyers')}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase text-muted-foreground">Buyer Receivables</span>
-            <span className="h-2 w-2 rounded-full bg-foreground"></span>
-          </div>
-          <div className="mt-2 font-mono text-2xl font-bold text-foreground">{money(data.totalBuyerReceivables || 0)}</div>
-        </div>
-
-        <div className="panel cursor-pointer rounded-xl p-4 border border-border/80 transition hover:border-foreground/40" onClick={() => navigate('suppliers')}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase text-muted-foreground">Supplier Payables</span>
-            <span className="h-2 w-2 rounded-full bg-foreground"></span>
-          </div>
-          <div className="mt-2 font-mono text-2xl font-bold text-foreground">{money(data.totalSupplierPayables || 0)}</div>
-        </div>
-
-        <div className="panel cursor-pointer rounded-xl p-4 border border-border/80 transition hover:border-foreground/40" onClick={() => navigate('expenses')}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase text-muted-foreground">Expenses Logged</span>
-            <span className="h-2 w-2 rounded-full bg-foreground"></span>
-          </div>
-          <div className="mt-2 font-mono text-2xl font-bold text-foreground">{money(data.totalExpenses || 0)}</div>
-        </div>
-
-        <div className={`panel rounded-xl p-4 transition border ${isProfitable ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-red-500/5 border-red-500/30'}`}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase text-muted-foreground">
-              {isProfitable ? 'Net Profit' : 'Net Loss'}
-            </span>
-            {isProfitable ? (
-              <TrendingUp size={18} className="text-emerald-600" />
-            ) : (
-              <TrendingDown size={18} className="text-red-600" />
-            )}
-          </div>
-          <div className={`mt-2 font-mono text-2xl font-bold ${isProfitable ? 'text-emerald-600' : 'text-red-600'}`}>
-            {isProfitable ? `+${money(netProfit)}` : `-${money(Math.abs(netProfit))}`}
-          </div>
-        </div>
-      </div>
-
-      <div className="panel rounded-xl p-5 border border-border/80">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-bold text-foreground">Weekly Sales Rhythm</h3>
-            <p className="mt-1 text-xs text-muted-foreground">Invoiced revenue over the last 7 days</p>
-          </div>
-          <div className="rounded-md bg-muted px-2 py-1 font-mono text-[10px] font-bold text-foreground">
-            LAST 7 DAYS
-          </div>
-        </div>
-
-        <div className="mt-8 flex h-52 items-end gap-2 sm:gap-4 border-b border-border/60 pb-2">
-          {trend.length ? (
-            trend.map((point: any) => {
-              const heightPercent = Math.max((point.value / maxTrendValue) * 100, 4);
-              return (
-                <div key={point.day} className="group flex min-w-0 flex-1 flex-col items-center gap-2">
-                  <div className="relative flex h-40 w-full items-end justify-center">
-                    <div className="absolute -top-7 rounded bg-foreground px-2 py-1 font-mono text-[10px] text-background opacity-0 transition-all group-hover:opacity-100 z-10 shadow-lg pointer-events-none">
-                      {money(point.value)}
-                    </div>
-                    <div 
-                      className="w-full max-w-[36px] rounded-t-md bg-foreground/80 transition-all duration-300 group-hover:bg-foreground" 
-                      style={{ height: `${heightPercent}%` }} 
-                    />
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span className="font-mono text-[11px] font-bold text-foreground">{point.day}</span>
-                    <span className="text-[9px] text-muted-foreground">{point.date}</span>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="w-full">
-              <Empty title="No weekly sales data available" detail="Create invoices to see your 7-day trend chart." />
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="panel rounded-xl p-5 border border-border/80">
-        <h3 className="font-bold text-foreground">Quick Actions</h3>
-        <p className="mb-4 text-xs text-muted-foreground">Jump directly to common tasks</p>
-        <div className="flex flex-wrap gap-3">
-          <Button onClick={() => navigate('sales')} testId="nav-action-new-sale">
-            <ShoppingCart size={16} /> New Sale Invoice
-          </Button>
-          <Button variant="outline" onClick={() => navigate('invoices')}>
-            <FileText size={16} /> All Invoices
-          </Button>
-          <Button variant="outline" onClick={() => navigate('buyers')} testId="nav-action-add-buyer">
-            <Users size={16} /> Manage Buyers
-          </Button>
-          <Button variant="outline" onClick={() => navigate('products')} testId="nav-action-products">
-            <Package size={16} /> Inventory Catalog
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MainApp() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
 
@@ -325,6 +183,7 @@ function MainApp() {
 
   const commonProps = {
     PageIntro,
+    Stat,
     Button,
     Field,
     Modal,
@@ -394,7 +253,7 @@ function MainApp() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        {activeTab === 'dashboard' && <DashboardOverview money={money} navigate={setActiveTab} />}
+        {activeTab === 'dashboard' && <Dashboard {...commonProps} />}
         {activeTab === 'sales' && <Sales {...commonProps} />}
         {activeTab === 'invoices' && <Invoices {...commonProps} />}
         {activeTab === 'buyers' && <Buyers {...commonProps} />}
