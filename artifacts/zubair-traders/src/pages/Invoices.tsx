@@ -1,11 +1,33 @@
 import React, { useState, useMemo } from 'react';
 import { FileText, Printer, Search, Filter, Calendar, X } from 'lucide-react';
-import { useGetSales, useGetBuyerPayments, useGetPurchases } from '../hooks/useSupabaseData';
+import { useQuery } from '@tanstack/react-query';
+import { useGetSales, useGetBuyerPayments } from '../hooks/useSupabaseData';
+import { supabase } from '../lib/supabase';
 
 export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
   const sales = useGetSales();
   const buyerPayments = useGetBuyerPayments();
-  const purchases = useGetPurchases();
+
+  // Query purchases directly from Supabase to prevent build export missing errors
+  const purchases = useQuery({
+    queryKey: ['purchases'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('purchases')
+        .select(`
+          *,
+          suppliers ( name ),
+          purchase_invoice_items (
+            *,
+            products ( name )
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
