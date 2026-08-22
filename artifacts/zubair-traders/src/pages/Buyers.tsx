@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Pencil, CreditCard } from 'lucide-react';
+import { Plus, Search, Pencil, CreditCard, HandCoins } from 'lucide-react';
 import { 
   useGetBuyers, 
   getGetBuyersQueryKey, 
   useCreateBuyer, 
-  useUpdateBuyer 
+  useUpdateBuyer,
+  useCollectBuyerPayment
 } from '../hooks/useSupabaseData';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -12,11 +13,17 @@ export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed,
   const q = useGetBuyers({ query: { queryKey: getGetBuyersQueryKey() } });
   const create = useCreateBuyer();
   const update = useUpdateBuyer();
+  const collectPayment = useCollectBuyerPayment();
   const qc = useQueryClient();
 
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<any>(null);
   const [modal, setModal] = useState(false);
+
+  // Payment Modal State
+  const [paymentModal, setPaymentModal] = useState(false);
+  const [selectedBuyer, setSelectedBuyer] = useState<any>(null);
+  const [paymentForm, setPaymentForm] = useState({ amount: '', notes: '' });
 
   const blank = { name: '', phone: '', cnic: '', address: '', creditLimit: '' };
   const [form, setForm] = useState(blank);
@@ -47,6 +54,12 @@ export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed,
     setModal(true);
   };
 
+  const openPaymentModal = (buyer: any) => {
+    setSelectedBuyer(buyer);
+    setPaymentForm({ amount: '', notes: 'Payment Received' });
+    setPaymentModal(true);
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const data = { ...form, creditLimit: Number(form.creditLimit) };
@@ -60,6 +73,27 @@ export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed,
     } else {
       create.mutate({ data }, { onSuccess: finish });
     }
+  };
+
+  const submitPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBuyer || !paymentForm.amount) return;
+
+    collectPayment.mutate(
+      {
+        buyerId: selectedBuyer.id,
+        amount: Number(paymentForm.amount),
+        notes: paymentForm.notes,
+      },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetBuyersQueryKey() });
+          setPaymentModal(false);
+          setSelectedBuyer(null);
+          setPaymentForm({ amount: '', notes: '' });
+        },
+      }
+    );
   };
 
   return (
@@ -120,7 +154,7 @@ export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed,
                   <th className="pb-3">Phone</th>
                   <th className="pb-3">Credit limit</th>
                   <th className="pb-3">Current udhaar</th>
-                  <th className="pb-3 text-right">Edit</th>
+                  <th className="pb-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/70">
@@ -142,13 +176,26 @@ export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed,
                         </span>
                       </td>
                       <td className="py-3 text-right">
-                        <button 
-                          data-testid={`button-edit-buyer-${b.id}`} 
-                          onClick={() => open(b)} 
-                          className="rounded-md p-2 text-muted-foreground hover:bg-muted"
-                        >
-                          <Pencil size={15} />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          {balance > 0 && (
+                            <button
+                              data-testid={`button-collect-payment-${b.id}`}
+                              onClick={() => openPaymentModal(b)}
+                              className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2.5 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400"
+                              title="Collect Payment"
+                            >
+                              <HandCoins size={14} /> Receive
+                            </button>
+                          )}
+                          <button 
+                            data-testid={`button-edit-buyer-${b.id}`} 
+                            onClick={() => open(b)} 
+                            className="rounded-md p-2 text-muted-foreground hover:bg-muted"
+                            title="Edit Customer"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -181,6 +228,46 @@ export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed,
             <Field label="Credit limit" name="buyer-limit" type="number" value={form.creditLimit} onChange={(v: string) => setForm({ ...form, creditLimit: v })} required />
             <Button type="submit" disabled={create.isPending || update.isPending} testId="button-save-buyer">
               {create.isPending || update.isPending ? 'Saving…' : 'Save customer'}
+            </Button>
+          </form>
+        </Modal>
+      )}
+
+      {paymentModal && selectedBuyer && (
+        <Modal 
+          title={`Collect Payment - ${selectedBuyer.name}`} 
+          eyebrow="Outstanding balance payment" 
+          onClose={() => setPaymentModal(false)}
+        >
+          <form onSubmit={submitPayment} className="grid gap-3">
+            <div className="rounded-lg bg-muted p-3 text-sm">
+              <div className="text-xs text-muted-foreground">Current Udhaar Balance</div>
+              <div className="text-lg font-bold text-accent font-mono">
+                {money(selectedBuyer.currentBalance ?? selectedBuyer.current_balance ?? 0)}
+              </div>
+            </div>
+
+            <Field 
+              label="Amount Received (PKR)" 
+              name="payment-amount" 
+              type="number" 
+              value={paymentForm.amount} 
+              onChange={(v: string) => setPaymentForm({ ...paymentForm, amount: v })} 
+              required 
+            />
+            <Field 
+              label="Notes / Reference" 
+              name="payment-notes" 
+              value={paymentForm.notes} 
+              onChange={(v: string) => setPaymentForm({ ...paymentForm, notes: v })} 
+            />
+
+            <Button 
+              type="submit" 
+              disabled={collectPayment.isPending || !paymentForm.amount} 
+              testId="button-submit-payment"
+            >
+              {collectPayment.isPending ? 'Processing…' : 'Confirm Payment'}
             </Button>
           </form>
         </Modal>

@@ -229,6 +229,52 @@ export function useUpdateBuyer() {
   });
 }
 
+export function useCollectBuyerPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ buyerId, amount, notes }: { buyerId: string | number; amount: number; notes?: string }) => {
+      // 1. Create a zero-total sales invoice record representing pure payment receipt
+      const { data: resInvoice, error: invError } = await supabase.from('sales_invoices').insert([{
+        buyer_id: buyerId,
+        total_amount: 0,
+        paid_amount: amount,
+        due_amount: -amount,
+        payment_status: 'PAID',
+        notes: notes || 'Payment Received',
+      }]).select().single();
+
+      if (invError) throw invError;
+
+      // 2. Fetch current balance of the buyer
+      const { data: currentBuyer, error: buyerError } = await supabase
+        .from('buyers')
+        .select('current_balance')
+        .eq('id', buyerId)
+        .single();
+
+      if (buyerError) throw buyerError;
+
+      // 3. Deduct payment from current balance
+      const existingBalance = Number(currentBuyer.current_balance || 0);
+      const newBalance = existingBalance - amount;
+
+      const { error: updateError } = await supabase
+        .from('buyers')
+        .update({ current_balance: newBalance })
+        .eq('id', buyerId);
+
+      if (updateError) throw updateError;
+
+      return resInvoice;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['buyers'] });
+      qc.invalidateQueries({ queryKey: ['sales'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
 export function useGetSales() {
   return useQuery({
     queryKey: ['sales'],
