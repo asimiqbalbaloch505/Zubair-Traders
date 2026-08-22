@@ -14,7 +14,7 @@ import { Expenses } from './pages/Expenses';
 import { Loans } from './pages/Loans';
 import { Reports } from './pages/Reports';
 import { Invoices } from './pages/Invoices';
-import { Dashboard } from './pages/dashboard';
+import { Dashboard } from './pages/Dashboard';
 
 const queryClient = new QueryClient({
   defaultOptions: {
