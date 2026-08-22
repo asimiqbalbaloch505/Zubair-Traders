@@ -234,15 +234,30 @@ export function useCollectBuyerPayment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ buyerId, amount, notes, paymentMethod }: { buyerId: string | number; amount: number; notes?: string; paymentMethod?: string }) => {
-      // 1. Insert into buyer_payments table
-      const { data: receipt, error: receiptError } = await supabase.from('buyer_payments').insert([{
-        buyer_id: buyerId,
-        amount: amount,
-        payment_method: paymentMethod || 'Cash',
-        notes: notes || 'Udhaar Payment Collected',
-      }]).select().single();
+      // Ensure numeric/string parameters are clean
+      const parsedAmount = Number(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        throw new Error('Please enter a valid payment amount.');
+      }
 
-      if (receiptError) throw receiptError;
+      // 1. Insert into buyer_payments table
+      const { data: receipt, error: receiptError } = await supabase
+        .from('buyer_payments')
+        .insert([
+          {
+            buyer_id: String(buyerId),
+            amount: parsedAmount,
+            payment_method: paymentMethod || 'Cash',
+            notes: notes || 'Udhaar Payment Collected',
+          },
+        ])
+        .select()
+        .single();
+
+      if (receiptError) {
+        console.error('Error inserting payment receipt:', receiptError);
+        throw receiptError;
+      }
 
       // 2. Fetch current balance of buyer
       const { data: currentBuyer, error: buyerError } = await supabase
@@ -251,18 +266,24 @@ export function useCollectBuyerPayment() {
         .eq('id', buyerId)
         .single();
 
-      if (buyerError) throw buyerError;
+      if (buyerError) {
+        console.error('Error fetching buyer balance:', buyerError);
+        throw buyerError;
+      }
 
       // 3. Deduct payment from current balance
       const existingBalance = Number(currentBuyer.current_balance || 0);
-      const newBalance = existingBalance - amount;
+      const newBalance = existingBalance - parsedAmount;
 
       const { error: updateError } = await supabase
         .from('buyers')
         .update({ current_balance: newBalance })
         .eq('id', buyerId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Error updating buyer balance:', updateError);
+        throw updateError;
+      }
 
       return receipt;
     },
@@ -271,8 +292,12 @@ export function useCollectBuyerPayment() {
       qc.invalidateQueries({ queryKey: ['buyer_payments'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
+    onError: (error: any) => {
+      alert(`Payment Failed: ${error.message || 'Unknown database error'}`);
+    },
   });
 }
+
 
 // Fetch payment history receipts for a specific buyer or all buyers
 export function useGetBuyerPayments(buyerId?: string | number) {
