@@ -147,13 +147,11 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
 
     const totalCollected = initialDown + directReceipts;
 
-    // Udhaar is customer-specific overall balance or total overall
-    const totalUdhaar = activeBuyer
-      ? activeBuyer.totalUdhaar
-      : buyerLedgerData.reduce((acc, b) => acc + b.totalUdhaar, 0);
+    // Dynamically calculate Udhaar based on filtered date range and selected customer
+    const totalUdhaar = Math.max(0, totalSales - totalCollected);
 
     return { totalSales, totalCollected, totalUdhaar };
-  }, [filteredSales, filteredPayments, activeBuyer, buyerLedgerData]);
+  }, [filteredSales, filteredPayments]);
 
   // Combined Merged Transactions
   const transactionsList = useMemo(() => {
