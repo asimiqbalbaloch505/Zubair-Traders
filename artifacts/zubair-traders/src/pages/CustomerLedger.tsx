@@ -1,360 +1,434 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Calendar, HandCoins, FileText, ArrowDownLeft, ArrowUpRight, Wallet } from 'lucide-react';
-import { useGetBuyers, useGetBuyerPayments, useGetSales, useCollectBuyerPayment, getGetBuyersQueryKey } from '../hooks/useSupabaseData';
-import { useQueryClient } from '@tanstack/react-query';
+import React, { useState, useMemo } from 'react';
+import { FileText, Printer, Search, Plus, Calendar, X, CreditCard, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { useGetSales, useGetCustomers, useGetPayments } from '../hooks/useSupabaseData';
 
-export function CustomerLedger({ 
-  PageIntro, 
-  Button, 
-  Field, 
-  Modal, 
-  Loading, 
-  Failed, 
-  Empty, 
-  money, 
-  timeDate, 
-  initialBuyerId 
-}: any) {
-  const buyersQuery = useGetBuyers();
-  const salesQuery = useGetSales();
-  const qc = useQueryClient();
+export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
+  const sales = useGetSales();
+  const customers = useGetCustomers();
+  const payments = useGetPayments(); // Fetch debt/collection payments
 
-  const buyers = buyersQuery.data || [];
-  const [selectedBuyerId, setSelectedBuyerId] = useState<string>(initialBuyerId || '');
-  const [activeTab, setActiveTab] = useState<'all' | 'invoices' | 'payments'>('all');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');
 
-  // Collect Payment Modal
-  const [paymentModal, setPaymentModal] = useState(false);
-  const [paymentForm, setPaymentForm] = useState({ amount: '', notes: 'Udhaar Payment Collected', paymentMethod: 'Cash' });
-  const collectPayment = useCollectBuyerPayment();
+  // 1. Calculate Ledger Metrics per Customer
+  const customerLedgerData = useMemo(() => {
+    if (!customers.data) return [];
 
-  // Set selected buyer when initialBuyerId changes or when buyers load
-  useEffect(() => {
-    if (initialBuyerId) {
-      setSelectedBuyerId(initialBuyerId);
-    } else if (buyers.length > 0 && !selectedBuyerId) {
-      setSelectedBuyerId(buyers[0].id);
-    }
-  }, [buyers, selectedBuyerId, initialBuyerId]);
+    const salesData = sales.data || [];
+    const paymentData = payments.data || [];
 
-  const currentBuyer = useMemo(() => {
-    return buyers.find((b: any) => b.id === selectedBuyerId) || null;
-  }, [buyers, selectedBuyerId]);
+    return customers.data.map((cust: any) => {
+      const custId = cust.id;
+      const custName = cust.name || cust.customer_name || '';
 
-  // Fetch payments for selected buyer
-  const paymentsQuery = useGetBuyerPayments(selectedBuyerId);
+      // Get all sales invoices associated with this customer
+      const custSales = salesData.filter(
+        (s: any) =>
+          String(s.customerId || s.customer_id) === String(custId) ||
+          String(s.buyerName || s.buyer_name).toLowerCase() === custName.toLowerCase()
+      );
 
-  // Filter buyer sales
-  const buyerInvoices = useMemo(() => {
-    if (!currentBuyer || !salesQuery.data) return [];
-    return salesQuery.data.filter((s: any) => s.buyer_id === currentBuyer.id || s.buyerName === currentBuyer.name);
-  }, [currentBuyer, salesQuery.data]);
+      // Get all collection payments received from this customer
+      const custPayments = paymentData.filter(
+        (p: any) =>
+          String(p.customerId || p.customer_id) === String(custId) ||
+          String(p.customerName || p.customer_name).toLowerCase() === custName.toLowerCase()
+      );
 
-  const buyerPayments = paymentsQuery.data || [];
+      // Aggregate Total Invoiced Amount
+      const totalInvoiced = custSales.reduce(
+        (sum: number, s: any) => sum + Number(s.totalAmount ?? s.total_amount ?? 0),
+        0
+      );
 
-  // Combine invoices and payments into a single timeline
-  const combinedLedger = useMemo(() => {
-    const invoices = buyerInvoices.map((inv: any) => ({
-      id: inv.id,
-      type: 'invoice',
-      refNo: inv.invoiceNumber || inv.invoice_number || inv.id,
-      date: inv.created_at || inv.transactionTime,
-      amount: Number(inv.totalAmount ?? inv.total_amount ?? 0),
-      status: inv.paymentStatus || inv.payment_status || 'unpaid',
-      details: `${inv.items?.length || 0} line items`,
-      raw: inv
+      // Initial down payments made at invoice creation time
+      const initialDownPayments = custSales.reduce(
+        (sum: number, s: any) => sum + Number(s.paidAmount ?? s.paid_amount ?? 0),
+        0
+      );
+
+      // Total collections recorded in debt receipts
+      const directReceipts = custPayments.reduce(
+        (sum: number, p: any) => sum + Number(p.amount ?? p.paid_amount ?? 0),
+        0
+      );
+
+      const totalPaid = initialDownPayments + directReceipts;
+      const totalUdhaar = Math.max(0, totalInvoiced - totalPaid);
+
+      return {
+        ...cust,
+        totalInvoiced,
+        totalPaid,
+        totalUdhaar,
+        invoices: custSales,
+        payments: custPayments,
+      };
+    });
+  }, [customers.data, sales.data, payments.data]);
+
+  // Selected customer object
+  const activeCustomer = useMemo(() => {
+    if (!selectedCustomerId) return null;
+    return customerLedgerData.find((c: any) => String(c.id) === String(selectedCustomerId)) || null;
+  }, [customerLedgerData, selectedCustomerId]);
+
+  // Unified Transaction History Timeline (Invoices + Payments)
+  const customerTransactions = useMemo(() => {
+    if (!activeCustomer) return [];
+
+    const invs = activeCustomer.invoices.map((inv: any) => {
+      const total = Number(inv.totalAmount ?? inv.total_amount ?? 0);
+      const paid = Number(inv.paidAmount ?? inv.paid_amount ?? 0);
+      const statusRaw = String(inv.paymentStatus || inv.payment_status || '').toLowerCase();
+
+      let status = 'unpaid';
+      if (statusRaw === 'paid' || paid >= total) {
+        status = 'paid';
+      } else if (statusRaw === 'partial' || statusRaw === 'partially_paid' || paid > 0) {
+        status = 'partial';
+      }
+
+      return {
+        id: inv.id,
+        type: 'INVOICE',
+        refNo: inv.invoiceNumber || inv.invoice_number || inv.id,
+        date: inv.created_at || inv.transactionTime,
+        amount: total,
+        paidAmount: paid,
+        dueAmount: Math.max(0, total - paid),
+        status,
+        raw: inv,
+      };
+    });
+
+    const pmts = activeCustomer.payments.map((pmt: any) => ({
+      id: pmt.id,
+      type: 'PAYMENT',
+      refNo: pmt.receiptNumber || pmt.receipt_number || pmt.id,
+      date: pmt.created_at || pmt.payment_date || pmt.transactionTime,
+      amount: Number(pmt.amount ?? pmt.paid_amount ?? 0),
+      paidAmount: Number(pmt.amount ?? pmt.paid_amount ?? 0),
+      dueAmount: 0,
+      status: 'paid',
+      raw: pmt,
     }));
 
-    const collections = buyerPayments.map((p: any) => ({
-      id: p.id,
-      type: 'payment',
-      refNo: `REC-${p.id}`,
-      date: p.created_at,
-      amount: Number(p.amount ?? 0),
-      status: 'collected',
-      details: p.notes || p.payment_method || 'Cash Payment',
-      raw: p
-    }));
+    // Merge & Sort Chronologically descending
+    const merged = [...invs, ...pmts].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
 
-    let merged = [];
-    if (activeTab === 'invoices') merged = invoices;
-    else if (activeTab === 'payments') merged = collections;
-    else merged = [...invoices, ...collections];
-
-    // Sort by Date descending
-    merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    // Apply filters
     return merged.filter((item) => {
       if (dateFilter) {
-        const itemDate = new Date(item.date).toISOString().split('T')[0];
-        if (itemDate !== dateFilter) return false;
+        const itemDateStr = new Date(item.date).toISOString().split('T')[0];
+        if (itemDateStr !== dateFilter) return false;
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        return String(item.refNo).toLowerCase().includes(q) || item.details.toLowerCase().includes(q);
+        return String(item.refNo).toLowerCase().includes(q);
       }
       return true;
     });
-  }, [buyerInvoices, buyerPayments, activeTab, dateFilter, searchQuery]);
+  }, [activeCustomer, dateFilter, searchQuery]);
 
-  const submitPayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentBuyer || !paymentForm.amount) return;
-
-    collectPayment.mutate(
-      {
-        buyerId: currentBuyer.id,
-        amount: Number(paymentForm.amount),
-        notes: paymentForm.notes,
-        paymentMethod: paymentForm.paymentMethod,
-      },
-      {
-        onSuccess: () => {
-          qc.invalidateQueries({ queryKey: getGetBuyersQueryKey() });
-          paymentsQuery.refetch();
-          setPaymentModal(false);
-          setPaymentForm({ amount: '', notes: 'Udhaar Payment Collected', paymentMethod: 'Cash' });
-        },
-      }
+  // Filtered customer directory list for search input
+  const filteredCustomers = useMemo(() => {
+    if (!searchQuery.trim()) return customerLedgerData;
+    const q = searchQuery.toLowerCase();
+    return customerLedgerData.filter(
+      (c: any) =>
+        String(c.name || '').toLowerCase().includes(q) ||
+        String(c.phone || '').includes(q)
     );
-  };
+  }, [customerLedgerData, searchQuery]);
 
-  const isLoading = buyersQuery.isLoading || salesQuery.isLoading || paymentsQuery.isLoading;
+  if (customers.isLoading || sales.isLoading) return <Loading />;
+  if (customers.isError || sales.isError) return <Failed onRetry={() => customers.refetch()} />;
 
   return (
     <div className="animate-in space-y-6">
       <PageIntro
-        eyebrow="Account Statements"
-        title="Customer Ledger Directory"
-        detail="Complete statement of invoices, payment receipts, and outstanding balances."
+        eyebrow="Financial Records"
+        title="Customer Udhaar & Ledger"
+        detail="Track customer credit balances, payment collection history, and detailed sales statements."
       />
 
-      {/* Customer Selection & Summary Card */}
-      <div className="panel rounded-xl p-5 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4">
-          <div className="flex-1 max-w-md">
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Select Customer</label>
-            <select
-              value={selectedBuyerId}
-              onChange={(e) => setSelectedBuyerId(e.target.value)}
-              className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-semibold outline-none focus:border-primary"
-            >
-              {buyers.map((b: any) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.phone || 'No Phone'})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {currentBuyer && (
-            <Button onClick={() => setPaymentModal(true)} testId="button-collect-ledger">
-              <HandCoins size={16} /> Collect Payment
-            </Button>
-          )}
-        </div>
-
-        {currentBuyer && (() => {
-          // Calculate down payments made at the time of invoice creation
-          const invoiceDownPayments = buyerInvoices.reduce((acc: number, i: any) => {
-            return acc + Number(i.paidAmount ?? i.paid_amount ?? 0);
-          }, 0);
-
-          // Calculate direct payment collections
-          const directCollections = buyerPayments.reduce((acc: number, p: any) => {
-            return acc + Number(p.amount ?? 0);
-          }, 0);
-
-          const totalInvoiced = buyerInvoices.reduce((acc: number, i: any) => acc + Number(i.totalAmount ?? i.total_amount ?? 0), 0);
-          const totalCollected = invoiceDownPayments + directCollections;
-
-          return (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              <div className="rounded-lg bg-muted/50 p-4 border border-border">
-                <div className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
-                  <FileText size={14} /> Total Invoiced
-                </div>
-                <div className="mt-2 text-xl font-bold font-mono">
-                  {money(totalInvoiced)}
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-emerald-500/10 p-4 border border-emerald-500/20">
-                <div className="text-xs font-semibold uppercase text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                  <ArrowDownLeft size={14} /> Total Collected
-                </div>
-                <div className="mt-2 text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
-                  {money(totalCollected)}
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-accent/10 p-4 border border-accent/20">
-                <div className="text-xs font-semibold uppercase text-accent flex items-center gap-1.5">
-                  <Wallet size={14} /> Current Udhaar Due
-                </div>
-                <div className="mt-2 text-xl font-bold font-mono text-accent">
-                  {money(currentBuyer.currentBalance ?? currentBuyer.current_balance ?? 0)}
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-
-      {/* Filter and Ledger Table */}
-      <div className="panel rounded-xl p-5">
-        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab('all')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
-                activeTab === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              All Activity
-            </button>
-            <button
-              onClick={() => setActiveTab('invoices')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
-                activeTab === 'invoices' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Invoices Only
-            </button>
-            <button
-              onClick={() => setActiveTab('payments')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
-                activeTab === 'payments' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Collections Only
-            </button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative max-w-xs">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+      {/* Customer Selection Card Grid */}
+      {!selectedCustomerId ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="relative flex-1 max-w-xs">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search ref # or notes..."
+                placeholder="Search customer by name or phone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 w-full rounded-lg border border-input bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
-              />
-            </div>
-
-            <div className="relative flex items-center">
-              <Calendar size={14} className="absolute left-2.5 text-muted-foreground pointer-events-none" />
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="h-9 rounded-lg border border-input bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
+                className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none focus:border-primary"
               />
             </div>
           </div>
+
+          {filteredCustomers.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredCustomers.map((cust: any) => (
+                <div
+                  key={cust.id}
+                  onClick={() => setSelectedCustomerId(cust.id)}
+                  className="group cursor-pointer rounded-xl border border-border/80 bg-card p-4 transition-all hover:border-primary hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-foreground group-hover:text-primary">
+                      {cust.name || cust.customer_name}
+                    </h3>
+                    <span className="text-xs text-muted-foreground">{cust.phone || 'No Phone'}</span>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3 text-xs">
+                    <div>
+                      <span className="block text-muted-foreground">Total Dues</span>
+                      <span className="font-mono font-bold text-destructive">
+                        {money(cust.totalUdhaar)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-muted-foreground">Total Invoiced</span>
+                      <span className="font-mono font-semibold">{money(cust.totalInvoiced)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Empty title="No customers found" detail="No party accounts match your current query." />
+          )}
         </div>
-
-        {isLoading ? (
-          <Loading />
-        ) : combinedLedger.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="pb-3">Transaction Date</th>
-                  <th className="pb-3">Type</th>
-                  <th className="pb-3">Reference #</th>
-                  <th className="pb-3">Description / Details</th>
-                  <th className="pb-3 text-right">Debit (Billed)</th>
-                  <th className="pb-3 text-right">Credit (Paid)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/70">
-                {combinedLedger.map((row: any) => (
-                  <tr key={`${row.type}-${row.id}`} className="hover:bg-muted/30">
-                    <td className="py-3 text-xs text-muted-foreground">{timeDate(row.date)}</td>
-                    <td className="py-3 text-xs">
-                      {row.type === 'invoice' ? (
-                        <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-600">
-                          <ArrowUpRight size={12} /> Invoice
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-600">
-                          <ArrowDownLeft size={12} /> Payment
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 font-mono text-xs font-bold">{row.refNo}</td>
-                    <td className="py-3 text-xs text-muted-foreground">{row.details}</td>
-                    <td className="py-3 text-right font-mono text-xs font-semibold">
-                      {row.type === 'invoice' ? money(row.amount) : '-'}
-                    </td>
-                    <td className="py-3 text-right font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                      {row.type === 'payment' ? `+ ${money(row.amount)}` : '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      ) : (
+        /* Detailed Individual Ledger View */
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <Button variant="outline" onClick={() => setSelectedCustomerId('')}>
+              ← Back to All Customers
+            </Button>
+            <div className="text-right">
+              <h2 className="text-lg font-bold">{activeCustomer?.name || activeCustomer?.customer_name}</h2>
+              <p className="text-xs text-muted-foreground">{activeCustomer?.phone || 'No Contact Details'}</p>
+            </div>
           </div>
-        ) : (
-          <Empty title="No ledger records found" detail="Select another customer or clear your applied filters." />
-        )}
-      </div>
 
-      {/* Collect Payment Modal */}
-      {paymentModal && currentBuyer && (
-        <Modal
-          title={`Collect Payment - ${currentBuyer.name}`}
-          eyebrow="Udhaar Collection Entry"
-          onClose={() => setPaymentModal(false)}
-        >
-          <form onSubmit={submitPayment} className="grid gap-3">
-            <div className="rounded-lg bg-muted p-3 text-sm">
-              <div className="text-xs text-muted-foreground">Current Udhaar Balance</div>
-              <div className="text-lg font-bold text-accent font-mono">
-                {money(currentBuyer.currentBalance ?? currentBuyer.current_balance ?? 0)}
+          {/* Customer Summary Cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-border bg-card p-4">
+              <span className="text-xs text-muted-foreground">Total Sales Invoiced</span>
+              <div className="mt-1 font-mono text-xl font-bold">{money(activeCustomer?.totalInvoiced || 0)}</div>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-4">
+              <span className="text-xs text-muted-foreground">Total Payments Received</span>
+              <div className="mt-1 font-mono text-xl font-bold text-emerald-600">
+                {money(activeCustomer?.totalPaid || 0)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+              <span className="text-xs text-destructive">Current Udhaar (Balance Due)</span>
+              <div className="mt-1 font-mono text-xl font-bold text-destructive">
+                {money(activeCustomer?.totalUdhaar || 0)}
+              </div>
+            </div>
+          </div>
+
+          {/* Ledger Table Section */}
+          <div className="panel rounded-xl border border-border/80 p-5">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1 max-w-xs">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search ledger reference #..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="relative flex items-center">
+                <Calendar size={14} className="absolute left-2.5 text-muted-foreground pointer-events-none" />
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="h-10 rounded-lg border border-input bg-background pl-8 pr-7 text-xs font-semibold outline-none focus:border-primary"
+                />
+                {dateFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setDateFilter('')}
+                    className="absolute right-2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </div>
             </div>
 
-            <Field
-              label="Amount Received (PKR)"
-              name="payment-amount"
-              type="number"
-              value={paymentForm.amount}
-              onChange={(v: string) => setPaymentForm({ ...paymentForm, amount: v })}
-              required
-            />
+            <div className="overflow-x-auto">
+              {customerTransactions.length > 0 ? (
+                <table className="w-full min-w-[600px] text-left text-sm">
+                  <thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th className="pb-3">Transaction #</th>
+                      <th className="pb-3">Type</th>
+                      <th className="pb-3">Date</th>
+                      <th className="pb-3">Total Amount</th>
+                      <th className="pb-3">Paid / Received</th>
+                      <th className="pb-3">Status</th>
+                      <th className="pb-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/70">
+                    {customerTransactions.map((tx: any) => (
+                      <tr
+                        key={tx.id}
+                        onClick={() => tx.type === 'INVOICE' && setSelectedInvoice(tx.raw)}
+                        className={`transition ${tx.type === 'INVOICE' ? 'cursor-pointer hover:bg-muted/40' : ''}`}
+                      >
+                        <td className="py-3 font-mono text-xs font-bold text-foreground">
+                          {String(tx.refNo).replace(/^INV-?/i, '')}
+                        </td>
+                        <td className="py-3 text-xs">
+                          {tx.type === 'INVOICE' ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-blue-100 px-2 py-0.5 text-blue-800 font-semibold">
+                              <ArrowUpRight size={12} /> Invoice
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-emerald-800 font-semibold">
+                              <ArrowDownRight size={12} /> Payment
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 text-xs text-muted-foreground">{timeDate(tx.date)}</td>
+                        <td className="py-3 font-mono text-xs font-bold">{money(tx.amount)}</td>
+                        <td className="py-3 font-mono text-xs font-semibold text-emerald-700">
+                          {money(tx.paidAmount)}
+                        </td>
+                        <td className="py-3">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                              tx.status === 'paid'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : tx.status === 'partial'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {tx.status}
+                          </span>
+                        </td>
+                        <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          {tx.type === 'INVOICE' && (
+                            <button
+                              onClick={() => setSelectedInvoice(tx.raw)}
+                              className="rounded-md p-2 text-muted-foreground hover:bg-muted"
+                            >
+                              <FileText size={15} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <Empty title="No transactions found" detail="No ledger activity recorded for this criteria." />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Payment Method</label>
-              <select
-                value={paymentForm.paymentMethod}
-                onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
-                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-primary"
-              >
-                <option value="Cash">Cash</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Cheque">Cheque</option>
-                <option value="Other">Other</option>
-              </select>
+      {/* Invoice Detail View Modal */}
+      {selectedInvoice && (
+        <Modal
+          title={`Invoice #${String(selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.id).replace(/^INV-?/i, '')}`}
+          eyebrow="Invoice Itemized Statement"
+          onClose={() => setSelectedInvoice(null)}
+        >
+          <div className="space-y-4 text-sm printable-invoice">
+            <div className="flex justify-between border-b pb-3 text-xs text-muted-foreground">
+              <div>
+                <span className="font-semibold text-foreground">Client:</span>{' '}
+                {selectedInvoice.buyerName || selectedInvoice.buyer_name || 'Walk-in Buyer'}
+              </div>
+              <div>
+                <span className="font-semibold text-foreground">Date:</span>{' '}
+                {timeDate(selectedInvoice.created_at || selectedInvoice.transactionTime)}
+              </div>
             </div>
 
-            <Field
-              label="Notes / Reference"
-              name="payment-notes"
-              value={paymentForm.notes}
-              onChange={(v: string) => setPaymentForm({ ...paymentForm, notes: v })}
-            />
+            {selectedInvoice.items && selectedInvoice.items.length > 0 ? (
+              <div className="max-h-56 overflow-y-auto border-y py-2">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b text-muted-foreground">
+                      <th className="pb-1">Item Description</th>
+                      <th className="pb-1 text-center">Qty</th>
+                      <th className="pb-1 text-right">Unit Price</th>
+                      <th className="pb-1 text-right">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {selectedInvoice.items.map((item: any, idx: number) => (
+                      <tr key={idx}>
+                        <td className="py-1.5 font-medium">{item.productName || item.product_name}</td>
+                        <td className="py-1.5 text-center">{item.quantity}</td>
+                        <td className="py-1.5 text-right">{money(item.unitPrice ?? item.unit_price ?? 0)}</td>
+                        <td className="py-1.5 text-right font-mono">
+                          {money(item.totalPrice ?? item.total_price ?? 0)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="rounded bg-muted p-3 text-center text-xs text-muted-foreground">
+                No itemized product lines attached to this invoice record.
+              </div>
+            )}
 
-            <Button type="submit" disabled={collectPayment.isPending || !paymentForm.amount} testId="button-submit-payment">
-              {collectPayment.isPending ? 'Processing…' : 'Confirm Payment'}
-            </Button>
-          </form>
+            <div className="space-y-1.5 rounded-lg bg-muted/60 p-3 text-xs">
+              <div className="flex justify-between">
+                <span>Total Amount:</span>
+                <span className="font-mono font-bold">
+                  {money(selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0)}
+                </span>
+              </div>
+              <div className="flex justify-between text-emerald-700">
+                <span>Paid Amount:</span>
+                <span className="font-mono font-bold">
+                  {money(selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0)}
+                </span>
+              </div>
+              <div className="flex justify-between text-destructive">
+                <span>Balance Due:</span>
+                <span className="font-mono font-bold">
+                  {money(
+                    (selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0) -
+                      (selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0)
+                  )}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 print:hidden">
+              <Button variant="outline" onClick={() => window.print()}>
+                <Printer size={15} /> Print
+              </Button>
+              <Button onClick={() => setSelectedInvoice(null)}>Close</Button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>
