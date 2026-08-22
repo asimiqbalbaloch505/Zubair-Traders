@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
+import { Banknote, TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, FileText, CircleDollarSign, Receipt } from 'lucide-react';
 import { Link } from 'wouter';
-import { Plus, Banknote, TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, FileText, CircleDollarSign, Receipt } from 'lucide-react';
 import { useGetDashboard } from '../hooks/useSupabaseData';
 
 export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money }: any) {
@@ -32,7 +32,6 @@ export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money }: an
           eyebrow="OPERATIONS SUMMARY" 
           title="Dashboard" 
           detail="Zubair Traders cash position, sales volume, and quick actions." 
-          action={<Link href="/sales" data-testid="link-start-sale" className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition hover:brightness-110"><Plus size={16} /> Start a sale</Link>} 
         />
         <div className="self-start sm:self-center">
           <select 
