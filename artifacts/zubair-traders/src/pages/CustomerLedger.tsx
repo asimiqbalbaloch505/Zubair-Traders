@@ -1,16 +1,26 @@
 import React, { useState, useMemo } from 'react';
-import { FileText, Printer, Search, Calendar, X, ArrowDownRight, ArrowUpRight } from 'lucide-react';
-import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
+import { FileText, Printer, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Plus, CreditCard } from 'lucide-react';
+import { useGetSales, useGetBuyers, useGetBuyerPayments, useAddBuyerPayment } from '../hooks/useSupabaseData';
 
 export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
   const sales = useGetSales();
   const buyers = useGetBuyers();
   const payments = useGetBuyerPayments();
+  const addPaymentMutation = useAddBuyerPayment();
 
   const [selectedBuyerId, setSelectedBuyerId] = useState<string>('');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+
+  // Payment Modal State
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    buyerId: '',
+    amount: '',
+    paymentType: 'partial', // 'partial' | 'complete'
+    notes: '',
+  });
 
   // 1. Calculate Ledger Metrics per Buyer
   const buyerLedgerData = useMemo(() => {
@@ -23,33 +33,28 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
       const buyerId = buyer.id;
       const buyerName = buyer.name || '';
 
-      // Get all sales invoices for this buyer
       const buyerSales = salesData.filter(
         (s: any) =>
           String(s.buyer_id || s.buyerId) === String(buyerId) ||
           String(s.buyerName || s.buyer_name).toLowerCase() === buyerName.toLowerCase()
       );
 
-      // Get all payment collection receipts for this buyer
       const buyerPayments = paymentData.filter(
         (p: any) =>
           String(p.buyer_id || p.buyerId) === String(buyerId) ||
           String(p.buyers?.name || p.buyer_name).toLowerCase() === buyerName.toLowerCase()
       );
 
-      // Aggregate Total Invoiced Amount
       const totalInvoiced = buyerSales.reduce(
         (sum: number, s: any) => sum + Number(s.totalAmount ?? s.total_amount ?? 0),
         0
       );
 
-      // Down payments made at invoice creation time
       const initialDownPayments = buyerSales.reduce(
         (sum: number, s: any) => sum + Number(s.paidAmount ?? s.paid_amount ?? 0),
         0
       );
 
-      // Collection receipts recorded separately
       const directReceipts = buyerPayments.reduce(
         (sum: number, p: any) => sum + Number(p.amount ?? p.paid_amount ?? 0),
         0
@@ -69,13 +74,12 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     });
   }, [buyers.data, sales.data, payments.data]);
 
-  // Currently active selected buyer from dropdown
   const activeBuyer = useMemo(() => {
     if (!selectedBuyerId) return null;
     return buyerLedgerData.find((b: any) => String(b.id) === String(selectedBuyerId)) || null;
   }, [buyerLedgerData, selectedBuyerId]);
 
-  // Combined timeline of Invoices + Payments for selected customer (or overall if unselected)
+  // Combined timeline of Invoices + Payments
   const transactionsList = useMemo(() => {
     const targetSales = activeBuyer ? activeBuyer.invoices : (sales.data || []);
     const targetPayments = activeBuyer ? activeBuyer.payments : (payments.data || []);
@@ -119,7 +123,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
       raw: pmt,
     }));
 
-    // Merge & Sort Chronologically descending
     const merged = [...invs, ...pmts].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
@@ -140,7 +143,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     });
   }, [activeBuyer, sales.data, payments.data, dateFilter, searchQuery]);
 
-  // Calculate totals for active selection or global overall summary
   const summaryMetrics = useMemo(() => {
     if (activeBuyer) {
       return {
@@ -157,6 +159,56 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     return { totalSales, totalCollected, totalUdhaar };
   }, [activeBuyer, buyerLedgerData]);
 
+  // Open Payment Modal Pre-filling selected customer
+  const handleOpenPaymentModal = () => {
+    const targetBuyer = activeBuyer || (buyerLedgerData.length > 0 ? buyerLedgerData[0] : null);
+    setPaymentForm({
+      buyerId: selectedBuyerId || (targetBuyer ? String(targetBuyer.id) : ''),
+      amount: targetBuyer ? String(targetBuyer.totalUdhaar || '') : '',
+      paymentType: 'complete',
+      notes: '',
+    });
+    setIsPaymentModalOpen(true);
+  };
+
+  // Handle buyer change in modal
+  const handleModalBuyerChange = (bId: string) => {
+    const buyerObj = buyerLedgerData.find((b: any) => String(b.id) === String(bId));
+    setPaymentForm((prev) => ({
+      ...prev,
+      buyerId: bId,
+      amount: buyerObj ? String(buyerObj.totalUdhaar || '') : prev.amount,
+    }));
+  };
+
+  // Handle payment type change in modal (Partial vs Complete)
+  const handlePaymentTypeChange = (type: string) => {
+    const buyerObj = buyerLedgerData.find((b: any) => String(b.id) === String(paymentForm.buyerId));
+    setPaymentForm((prev) => ({
+      ...prev,
+      paymentType: type,
+      amount: type === 'complete' && buyerObj ? String(buyerObj.totalUdhaar || 0) : prev.amount,
+    }));
+  };
+
+  // Submit Payment Record
+  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paymentForm.buyerId || !paymentForm.amount || Number(paymentForm.amount) <= 0) return;
+
+    try {
+      await addPaymentMutation.mutateAsync({
+        buyer_id: paymentForm.buyerId,
+        amount: Number(paymentForm.amount),
+        notes: paymentForm.notes,
+        payment_date: new Date().toISOString(),
+      });
+      setIsPaymentModalOpen(false);
+    } catch (err) {
+      console.error('Failed to submit payment:', err);
+    }
+  };
+
   if (buyers.isLoading || sales.isLoading) return <Loading />;
   if (buyers.isError || sales.isError) return <Failed onRetry={() => buyers.refetch()} />;
 
@@ -168,8 +220,8 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         detail="View customer credit balances, collections history, and itemized invoice details."
       />
 
-      {/* Dropdown Customer Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Dropdown Customer Selector + Action Button */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div className="w-full sm:w-80">
           <label className="block text-xs font-semibold text-muted-foreground mb-1">
             Select Customer
@@ -187,6 +239,10 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
             ))}
           </select>
         </div>
+
+        <Button onClick={handleOpenPaymentModal} className="flex items-center gap-1.5">
+          <Plus size={16} /> Record Payment
+        </Button>
       </div>
 
       {/* Summary Cards: Total Sales, Collected, Udhaar */}
@@ -318,6 +374,96 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
           )}
         </div>
       </div>
+
+      {/* Record Payment Modal */}
+      {isPaymentModalOpen && (
+        <Modal
+          title="Record Udhaar Collection"
+          eyebrow="Receive Payment"
+          onClose={() => setIsPaymentModalOpen(false)}
+        >
+          <form onSubmit={handleRecordPaymentSubmit} className="space-y-4 text-xs">
+            <div>
+              <label className="block font-semibold text-muted-foreground mb-1">Customer</label>
+              <select
+                value={paymentForm.buyerId}
+                onChange={(e) => handleModalBuyerChange(e.target.value)}
+                required
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 outline-none focus:border-primary"
+              >
+                <option value="" disabled>Select Customer</option>
+                {buyerLedgerData.map((b: any) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} — (Udhaar: {money(b.totalUdhaar)})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-muted-foreground mb-1">Payment Type</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePaymentTypeChange('partial')}
+                  className={`h-9 rounded-lg border font-semibold transition ${
+                    paymentForm.paymentType === 'partial'
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-input hover:bg-muted'
+                  }`}
+                >
+                  Partial Payment
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePaymentTypeChange('complete')}
+                  className={`h-9 rounded-lg border font-semibold transition ${
+                    paymentForm.paymentType === 'complete'
+                      ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                      : 'border-input hover:bg-muted'
+                  }`}
+                >
+                  Complete Payment
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-muted-foreground mb-1">Amount Received</label>
+              <input
+                type="number"
+                min="1"
+                step="any"
+                required
+                placeholder="Enter payment amount"
+                value={paymentForm.amount}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 font-mono text-sm outline-none focus:border-primary"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold text-muted-foreground mb-1">Notes / Description (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. Cash payment / Bank transfer ref"
+                value={paymentForm.notes}
+                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 outline-none focus:border-primary"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setIsPaymentModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addPaymentMutation.isPending}>
+                {addPaymentMutation.isPending ? 'Saving...' : 'Save Payment'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       {/* Invoice Detail Modal */}
       {selectedInvoice && (
