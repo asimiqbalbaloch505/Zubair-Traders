@@ -23,7 +23,7 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
             unit_cost,
             products (default_purchase_cost)
           )
-        `).gt('total_amount', 0), // Filter out zero-amount invoices
+        `).gt('total_amount', 0),
         supabase.from('products').select('*'),
         supabase.from('buyers').select('*'),
         supabase.from('suppliers').select('*'),
@@ -236,7 +236,6 @@ export function useUpdateBuyer() {
   });
 }
 
-// Collection Hook: Saves directly to buyer_payments and updates customer balance
 export function useCollectBuyerPayment() {
   const qc = useQueryClient();
   return useMutation({
@@ -251,7 +250,6 @@ export function useCollectBuyerPayment() {
         throw new Error('Please enter a valid payment amount.');
       }
 
-      // 1. Insert into buyer_payments table
       const { data: receipt, error: receiptError } = await supabase
         .from('buyer_payments')
         .insert([
@@ -270,7 +268,6 @@ export function useCollectBuyerPayment() {
         throw receiptError;
       }
 
-      // 2. Fetch current balance of buyer
       const { data: currentBuyer, error: buyerError } = await supabase
         .from('buyers')
         .select('current_balance')
@@ -282,7 +279,6 @@ export function useCollectBuyerPayment() {
         throw buyerError;
       }
 
-      // 3. Deduct payment from current balance
       const existingBalance = Number(currentBuyer?.current_balance || 0);
       const newBalance = Math.max(0, existingBalance - parsedAmount);
 
@@ -310,7 +306,6 @@ export function useCollectBuyerPayment() {
   });
 }
 
-// Fetch payment history receipts for a specific buyer or all buyers
 export function useGetBuyerPayments(buyerId?: string | number) {
   return useQuery({
     queryKey: ['buyer_payments', buyerId],
@@ -428,7 +423,6 @@ export function useCreateSale() {
       const due = total - paid;
       const buyerId = data.buyerId || data.buyer_id;
 
-      // 1. Insert Invoice
       const { data: resInvoice, error: invError } = await supabase.from('sales_invoices').insert([{
         buyer_id: buyerId,
         total_amount: total,
@@ -440,7 +434,6 @@ export function useCreateSale() {
 
       if (invError) throw invError;
 
-      // 2. Insert Invoice Items & Deduct Stock
       if (data.items && data.items.length > 0) {
         const lineItems = data.items.map((item: any) => ({
           invoice_id: resInvoice.id,
@@ -454,7 +447,6 @@ export function useCreateSale() {
         const { error: itemsError } = await supabase.from('sales_invoice_items').insert(lineItems);
         if (itemsError) throw itemsError;
 
-        // Inventory Stock Deduction
         for (const item of data.items) {
           const prodId = item.productId || item.product_id;
           const qtySold = Number(item.quantity || item.qty || 1);
@@ -481,7 +473,6 @@ export function useCreateSale() {
         }
       }
 
-      // 3. Update Buyer Balance (if due exists and buyer assigned)
       if (buyerId && due > 0) {
         const { data: currentBuyer, error: buyerErr } = await supabase
           .from('buyers')
@@ -696,13 +687,24 @@ export function useCreatePurchase() {
   return useMutation({
     mutationFn: async ({ data }: { data: any }) => {
       const supplierId = data.supplierId || data.supplier_id;
-      const total = Number(data.totalAmount ?? data.total_amount ?? 0);
-      const paid = Number(data.paidAmount ?? data.paid_amount ?? 0);
-      const due = total - paid;
 
+      // 1. Calculate Realtime Total Cost if items are provided
+      let calculatedTotal = Number(data.totalAmount ?? data.total_amount ?? 0);
+      if (data.items && data.items.length > 0) {
+        calculatedTotal = data.items.reduce((sum: number, item: any) => {
+          const qty = Number(item.quantity || item.qty || 1);
+          const cost = Number(item.unitCost || item.purchase_cost || 0);
+          return sum + (qty * cost);
+        }, 0);
+      }
+
+      const paid = Number(data.paidAmount ?? data.paid_amount ?? 0);
+      const due = calculatedTotal - paid;
+
+      // 2. Insert purchase invoice
       const { data: purchase, error: purchaseError } = await supabase.from('purchase_invoices').insert([{
         supplier_id: supplierId,
-        total_amount: total,
+        total_amount: calculatedTotal,
         paid_amount: paid,
         due_amount: due,
         notes: data.notes || null,
@@ -711,14 +713,19 @@ export function useCreatePurchase() {
 
       if (purchaseError) throw purchaseError;
 
+      // 3. Insert purchase items and update product stock/pricing
       if (data.items && data.items.length > 0) {
-        const lineItems = data.items.map((item: any) => ({
-          purchase_id: purchase.id,
-          product_id: item.productId || item.product_id,
-          quantity: Number(item.quantity || item.qty || 1),
-          purchase_cost: Number(item.unitCost || item.purchase_cost || 0),
-          subtotal: Number(item.subtotal || item.totalPrice || 0)
-        }));
+        const lineItems = data.items.map((item: any) => {
+          const qty = Number(item.quantity || item.qty || 1);
+          const cost = Number(item.unitCost || item.purchase_cost || 0);
+          return {
+            purchase_id: purchase.id,
+            product_id: item.productId || item.product_id,
+            quantity: qty,
+            purchase_cost: cost,
+            subtotal: Number(item.subtotal || item.totalPrice || (qty * cost))
+          };
+        });
 
         const { error: purchaseItemsError } = await supabase.from('purchase_invoice_items').insert(lineItems);
         if (purchaseItemsError) throw purchaseItemsError;
@@ -740,7 +747,6 @@ export function useCreatePurchase() {
           if (currentProd) {
             const newStock = Number(currentProd.stock_quantity || 0) + qtyPurchased;
             
-            // Build stock and default prices update payload
             const updatePayload: any = { stock_quantity: newStock };
             if (newCost > 0) updatePayload.default_purchase_cost = newCost;
             if (newSell > 0) updatePayload.default_selling_price = newSell;
@@ -755,6 +761,7 @@ export function useCreatePurchase() {
         }
       }
 
+      // 4. Update Supplier Payable Balance when due balance remains
       if (supplierId && due > 0) {
         const { data: currentSupplier, error: supplierErr } = await supabase
           .from('suppliers')
