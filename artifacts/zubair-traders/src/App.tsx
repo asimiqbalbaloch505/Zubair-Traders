@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { 
   ShoppingCart, Users, Package, Truck, Wallet, 
   HandCoins, BarChart2, LayoutDashboard, Loader2, AlertCircle, Inbox, X,
-  TrendingUp, TrendingDown, FileText, Banknote, ArrowUpRight, ArrowDownRight, CircleDollarSign, Receipt
+  FileText, BookOpen
 } from 'lucide-react';
 
 import { Sales } from './pages/Sales';
@@ -15,6 +15,7 @@ import { Loans } from './pages/Loans';
 import { Reports } from './pages/Reports';
 import { Invoices } from './pages/Invoices';
 import { Dashboard } from './pages/Dashboard';
+import { CustomerLedger } from './pages/CustomerLedger';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -168,18 +169,27 @@ function Empty({ title, detail, action }: any) {
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [selectedLedgerBuyerId, setSelectedLedgerBuyerId] = useState<string | null>(null);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'sales', label: 'Sales', icon: ShoppingCart },
     { id: 'invoices', label: 'Invoices', icon: FileText },
     { id: 'buyers', label: 'Customers', icon: Users },
+    { id: 'ledger', label: 'Ledger', icon: BookOpen },
     { id: 'products', label: 'Stock', icon: Package },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
     { id: 'expenses', label: 'Expenses', icon: Wallet },
     { id: 'loans', label: 'Loans', icon: HandCoins },
     { id: 'reports', label: 'Reports', icon: BarChart2 },
   ];
+
+  const navigateToLedger = (buyerId?: string) => {
+    if (buyerId) {
+      setSelectedLedgerBuyerId(buyerId);
+    }
+    setActiveTab('ledger');
+  };
 
   const commonProps = {
     PageIntro,
@@ -193,6 +203,7 @@ function MainApp() {
     money,
     timeDate,
     shortDate,
+    onNavigateToLedger: navigateToLedger,
   };
 
   return (
@@ -257,6 +268,12 @@ function MainApp() {
         {activeTab === 'sales' && <Sales {...commonProps} />}
         {activeTab === 'invoices' && <Invoices {...commonProps} />}
         {activeTab === 'buyers' && <Buyers {...commonProps} />}
+        {activeTab === 'ledger' && (
+          <CustomerLedger 
+            {...commonProps} 
+            initialBuyerId={selectedLedgerBuyerId} 
+          />
+        )}
         {activeTab === 'products' && <Products {...commonProps} />}
         {activeTab === 'suppliers' && <Suppliers {...commonProps} />}
         {activeTab === 'expenses' && <Expenses {...commonProps} />}

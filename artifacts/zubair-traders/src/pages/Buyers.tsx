@@ -1,19 +1,27 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Pencil, CreditCard, HandCoins, FileText, Receipt } from 'lucide-react';
+import { Plus, Search, Pencil, CreditCard, HandCoins, FileText } from 'lucide-react';
 import { 
   useGetBuyers, 
   getGetBuyersQueryKey, 
   useCreateBuyer, 
   useUpdateBuyer,
-  useCollectBuyerPayment,
-  useGetBuyerPayments,
-  useGetSales
+  useCollectBuyerPayment
 } from '../hooks/useSupabaseData';
 import { useQueryClient } from '@tanstack/react-query';
 
-export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed, Empty, money }: any) {
+export function Buyers({ 
+  PageIntro, 
+  Stat, 
+  Button, 
+  Field, 
+  Modal, 
+  Loading, 
+  Failed, 
+  Empty, 
+  money, 
+  onNavigateToLedger 
+}: any) {
   const q = useGetBuyers({ query: { queryKey: getGetBuyersQueryKey() } });
-  const salesQuery = useGetSales();
   const create = useCreateBuyer();
   const update = useUpdateBuyer();
   const collectPayment = useCollectBuyerPayment();
@@ -28,13 +36,6 @@ export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed,
   const [selectedBuyer, setSelectedBuyer] = useState<any>(null);
   const [paymentForm, setPaymentForm] = useState({ amount: '', notes: '', paymentMethod: 'Cash' });
 
-  // Customer Ledger Modal State
-  const [ledgerBuyer, setLedgerBuyer] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'payments' | 'invoices'>('payments');
-
-  // Fetch payments for selected ledger buyer
-  const paymentsQuery = useGetBuyerPayments(ledgerBuyer?.id);
-
   const blank = { name: '', phone: '', cnic: '', address: '', creditLimit: '' };
   const [form, setForm] = useState(blank);
 
@@ -47,12 +48,6 @@ export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed,
   const totalReceivables = useMemo(() => {
     return (q.data || []).reduce((acc: number, b: any) => acc + Number(b.currentBalance ?? b.current_balance ?? 0), 0);
   }, [q.data]);
-
-  // Filter invoices for selected ledger customer
-  const buyerInvoices = useMemo(() => {
-    if (!ledgerBuyer || !salesQuery.data) return [];
-    return salesQuery.data.filter((s: any) => s.buyerName === ledgerBuyer.name || s.buyer_id === ledgerBuyer.id);
-  }, [ledgerBuyer, salesQuery.data]);
 
   const open = (b?: any) => {
     setEditing(b || null);
@@ -74,11 +69,6 @@ export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed,
     setSelectedBuyer(buyer);
     setPaymentForm({ amount: '', notes: 'Udhaar Payment Collected', paymentMethod: 'Cash' });
     setPaymentModal(true);
-  };
-
-  const openLedgerModal = (buyer: any) => {
-    setLedgerBuyer(buyer);
-    setActiveTab('payments');
   };
 
   const submit = (e: React.FormEvent) => {
@@ -200,7 +190,7 @@ export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed,
                       <td className="py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => openLedgerModal(b)}
+                            onClick={() => onNavigateToLedger && onNavigateToLedger(b.id)}
                             className="inline-flex items-center gap-1 rounded-md bg-muted px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/80"
                             title="View Customer Ledger"
                           >
@@ -315,144 +305,6 @@ export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed,
               {collectPayment.isPending ? 'Processing…' : 'Confirm Payment'}
             </Button>
           </form>
-        </Modal>
-      )}
-
-      {/* Customer Ledger Drawer Modal */}
-      {ledgerBuyer && (
-        <Modal 
-          title={`Customer Ledger - ${ledgerBuyer.name}`} 
-          eyebrow="Account History & Udhaar Statement" 
-          onClose={() => setLedgerBuyer(null)}
-        >
-          <div className="mb-4 flex items-center justify-between rounded-lg border border-border p-3 text-sm">
-            <div>
-              <div className="text-xs text-muted-foreground">Outstanding Udhaar Balance</div>
-              <div className="text-xl font-bold text-accent font-mono">
-                {money(ledgerBuyer.currentBalance ?? ledgerBuyer.current_balance ?? 0)}
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                const b = ledgerBuyer;
-                setLedgerBuyer(null);
-                openPaymentModal(b);
-              }}
-              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
-            >
-              <HandCoins size={15} /> Collect Udhaar
-            </button>
-          </div>
-
-          {/* Ledger Navigation Tabs */}
-          <div className="mb-4 flex border-b border-border">
-            <button
-              onClick={() => setActiveTab('payments')}
-              className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold ${
-                activeTab === 'payments' 
-                  ? 'border-primary text-primary' 
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Receipt size={14} /> Payment Receipts (Collections)
-            </button>
-            <button
-              onClick={() => setActiveTab('invoices')}
-              className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold ${
-                activeTab === 'invoices' 
-                  ? 'border-primary text-primary' 
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <FileText size={14} /> Sales Invoices
-            </button>
-          </div>
-
-          {/* Tab 1: Payment Receipts Table */}
-          {activeTab === 'payments' && (
-            <div>
-              {paymentsQuery.isLoading ? (
-                <Loading />
-              ) : paymentsQuery.data && paymentsQuery.data.length > 0 ? (
-                <div className="max-h-80 overflow-y-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="sticky top-0 bg-background border-b border-border text-[10px] uppercase text-muted-foreground">
-                      <tr>
-                        <th className="py-2">Receipt #</th>
-                        <th className="py-2">Date</th>
-                        <th className="py-2">Method</th>
-                        <th className="py-2 text-right">Amount Collected</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {paymentsQuery.data.map((p: any) => (
-                        <tr key={p.id}>
-                          <td className="py-2.5 font-mono text-xs font-semibold">REC-{p.id}</td>
-                          <td className="py-2.5 text-xs text-muted-foreground">
-                            {new Date(p.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="py-2.5 text-xs">
-                            <span className="rounded bg-muted px-2 py-0.5 font-medium">{p.payment_method || 'Cash'}</span>
-                          </td>
-                          <td className="py-2.5 font-mono text-right font-bold text-emerald-600 dark:text-emerald-400">
-                            + {money(p.amount)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="py-8 text-center text-xs text-muted-foreground">
-                  No payment receipts found for this customer.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Tab 2: Sales Invoices Table */}
-          {activeTab === 'invoices' && (
-            <div>
-              {buyerInvoices.length > 0 ? (
-                <div className="max-h-80 overflow-y-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="sticky top-0 bg-background border-b border-border text-[10px] uppercase text-muted-foreground">
-                      <tr>
-                        <th className="py-2">Invoice #</th>
-                        <th className="py-2">Date</th>
-                        <th className="py-2">Status</th>
-                        <th className="py-2 text-right font-mono">Total Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {buyerInvoices.map((inv: any) => (
-                        <tr key={inv.id}>
-                          <td className="py-2.5 font-mono text-xs font-semibold">{inv.invoiceNumber}</td>
-                          <td className="py-2.5 text-xs text-muted-foreground">
-                            {new Date(inv.transactionTime || inv.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="py-2.5 text-xs uppercase font-semibold">
-                            <span className={`rounded px-1.5 py-0.5 text-[10px] ${
-                              inv.paymentStatus === 'paid' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'
-                            }`}>
-                              {inv.paymentStatus}
-                            </span>
-                          </td>
-                          <td className="py-2.5 font-mono text-right font-bold">
-                            {money(inv.totalAmount)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="py-8 text-center text-xs text-muted-foreground">
-                  No sales invoices recorded for this customer.
-                </div>
-              )}
-            </div>
-          )}
         </Modal>
       )}
     </div>
