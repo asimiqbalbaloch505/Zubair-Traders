@@ -173,7 +173,7 @@ function MainApp() {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'sales', label: 'Sales', icon: ShoppingCart },
     { id: 'invoices', label: 'Invoices', icon: FileText },
-    { id: 'buyers', label: 'Buyers', icon: Users },
+    { id: 'buyers', label: 'Customers', icon: Users },
     { id: 'products', label: 'Stock', icon: Package },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
     { id: 'expenses', label: 'Expenses', icon: Wallet },
