@@ -682,13 +682,16 @@ export function useHealthCheck(_options?: any) {
   });
 }
 
-export function useCreatePurchase() {
+
+  export function useCreatePurchase() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ data }: { data: any }) => {
-      const supplierId = data.supplierId || data.supplier_id;
+      // 1. Sanitize supplierId: convert empty string to null or ensure valid ID format
+      const rawSupplierId = data.supplierId || data.supplier_id;
+      const supplierId = rawSupplierId && String(rawSupplierId).trim() !== '' ? rawSupplierId : null;
 
-      // 1. Calculate Realtime Total Cost if items are provided
+      // 2. Calculate Realtime Total Cost if items are provided
       let calculatedTotal = Number(data.totalAmount ?? data.total_amount ?? 0);
       if (data.items && data.items.length > 0) {
         calculatedTotal = data.items.reduce((sum: number, item: any) => {
@@ -699,9 +702,9 @@ export function useCreatePurchase() {
       }
 
       const paid = Number(data.paidAmount ?? data.paid_amount ?? 0);
-      const due = calculatedTotal - paid;
+      const due = Math.max(0, calculatedTotal - paid);
 
-      // 2. Insert purchase invoice
+      // 3. Insert purchase invoice
       const { data: purchase, error: purchaseError } = await supabase.from('purchase_invoices').insert([{
         supplier_id: supplierId,
         total_amount: calculatedTotal,
@@ -711,16 +714,22 @@ export function useCreatePurchase() {
         transaction_time: new Date().toISOString(),
       }]).select().single();
 
-      if (purchaseError) throw purchaseError;
+      if (purchaseError) {
+        console.error('purchase_invoices insert error detail:', purchaseError);
+        throw purchaseError;
+      }
 
-      // 3. Insert purchase items and update product stock/pricing
+      // 4. Insert purchase items and update product stock/pricing
       if (data.items && data.items.length > 0) {
         const lineItems = data.items.map((item: any) => {
           const qty = Number(item.quantity || item.qty || 1);
           const cost = Number(item.unitCost || item.purchase_cost || 0);
+          const rawProdId = item.productId || item.product_id;
+          
           return {
             purchase_id: purchase.id,
-            product_id: item.productId || item.product_id,
+            // Convert to Number if database primary key is bigint/integer
+            product_id: isNaN(Number(rawProdId)) ? rawProdId : Number(rawProdId),
             quantity: qty,
             purchase_cost: cost,
             subtotal: Number(item.subtotal || item.totalPrice || (qty * cost))
@@ -728,7 +737,10 @@ export function useCreatePurchase() {
         });
 
         const { error: purchaseItemsError } = await supabase.from('purchase_invoice_items').insert(lineItems);
-        if (purchaseItemsError) throw purchaseItemsError;
+        if (purchaseItemsError) {
+          console.error('purchase_invoice_items insert error detail:', purchaseItemsError);
+          throw purchaseItemsError;
+        }
 
         for (const item of data.items) {
           const prodId = item.productId || item.product_id;
@@ -761,7 +773,7 @@ export function useCreatePurchase() {
         }
       }
 
-      // 4. Update Supplier Payable Balance when due balance remains
+      // 5. Update Supplier Payable Balance when due balance remains
       if (supplierId && due > 0) {
         const { data: currentSupplier, error: supplierErr } = await supabase
           .from('suppliers')
@@ -790,6 +802,9 @@ export function useCreatePurchase() {
       qc.invalidateQueries({ queryKey: ['suppliers'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
+    onError: (error: any) => {
+      alert(`Restock Failed: ${error.message || 'Database validation error'}`);
+    }
   });
 }
 
