@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, PackagePlus, AlertTriangle, RefreshCw } from 'lucide-react';
 import { 
   useGetProducts, 
@@ -38,20 +38,36 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
     productId: '',
     purchaseCost: '',
     sellingPrice: '',
-    quantity: '',
+    quantity: '1',
     paidAmount: '',
     notes: ''
   });
 
-  // Handle Product Select in Restock Modal (Pre-fills default prices)
+  // Compute Total Cost dynamically: Quantity * Purchase Cost
+  const computedTotalCost = (Number(restockForm.quantity) || 0) * (Number(restockForm.purchaseCost) || 0);
+
+  // Auto-sync Paid Amount whenever Quantity or Purchase Cost changes
+  useEffect(() => {
+    setRestockForm(prev => ({
+      ...prev,
+      paidAmount: String(computedTotalCost)
+    }));
+  }, [restockForm.quantity, restockForm.purchaseCost]);
+
+  // Handle Product Select in Restock Modal (Pre-fills default prices & auto-calculates paid amount)
   const handleSelectProductForRestock = (productId: string) => {
     const selectedProd = q.data?.find((p: any) => String(p.id) === String(productId));
     if (selectedProd) {
+      const cost = Number(selectedProd.purchaseCost ?? 0);
+      const qty = Number(restockForm.quantity) || 1;
+      const initialTotal = qty * cost;
+
       setRestockForm(prev => ({
         ...prev,
         productId,
-        purchaseCost: String(selectedProd.purchaseCost ?? ''),
-        sellingPrice: String(selectedProd.sellingPrice ?? '')
+        purchaseCost: String(cost),
+        sellingPrice: String(selectedProd.sellingPrice ?? ''),
+        paidAmount: String(initialTotal)
       }));
     } else {
       setRestockForm(prev => ({ ...prev, productId }));
@@ -60,13 +76,17 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
 
   // Open Restock Modal directly for a specific row item
   const openRestockForProduct = (product: any) => {
+    const cost = Number(product.purchaseCost ?? 0);
+    const initialQty = 1;
+    const initialTotal = initialQty * cost;
+
     setRestockForm({
       supplierId: suppliersQuery.data?.[0]?.id || '',
       productId: String(product.id),
-      purchaseCost: String(product.purchaseCost ?? ''),
+      purchaseCost: String(cost),
       sellingPrice: String(product.sellingPrice ?? ''),
-      quantity: '',
-      paidAmount: '',
+      quantity: String(initialQty),
+      paidAmount: String(initialTotal),
       notes: ''
     });
     setRestockModal(true);
@@ -105,11 +125,11 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
   // Handle Restock Submission
   const handleRestockSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const qty = Number(restockForm.quantity);
-    const cost = Number(restockForm.purchaseCost);
-    const sell = Number(restockForm.sellingPrice);
-    const totalAmount = qty * cost;
-    const paidAmount = Number(restockForm.paidAmount || 0);
+    const qty = Number(restockForm.quantity) || 0;
+    const cost = Number(restockForm.purchaseCost) || 0;
+    const sell = Number(restockForm.sellingPrice) || 0;
+    const totalAmount = computedTotalCost;
+    const paidAmount = Math.max(0, Number(restockForm.paidAmount) || 0);
 
     createPurchase.mutate(
       {
@@ -138,7 +158,7 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
             productId: '',
             purchaseCost: '',
             sellingPrice: '',
-            quantity: '',
+            quantity: '1',
             paidAmount: '',
             notes: ''
           });
@@ -320,12 +340,11 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
             <div>
               <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Supplier</label>
               <select 
-                className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background p-2 text-sm outline-none focus:border-primary"
                 value={restockForm.supplierId}
                 onChange={(e) => setRestockForm({ ...restockForm, supplierId: e.target.value })}
-                required
               >
-                <option value="">Select Supplier</option>
+                <option value="">Walk-in / Cash Purchase (No Supplier)</option>
                 {suppliersQuery.data?.map((sup: any) => (
                   <option key={sup.id} value={sup.id}>
                     {sup.name} {sup.companyName ? `(${sup.companyName})` : ''}
@@ -337,7 +356,7 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
             <div>
               <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Product</label>
               <select 
-                className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background p-2 text-sm outline-none focus:border-primary"
                 value={restockForm.productId}
                 onChange={(e) => handleSelectProductForRestock(e.target.value)}
                 required
@@ -356,6 +375,7 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
                 label="Restock Quantity" 
                 name="restock-qty" 
                 type="number" 
+                min="1"
                 value={restockForm.quantity} 
                 onChange={(v: string) => setRestockForm({ ...restockForm, quantity: v })} 
                 required 
@@ -364,10 +384,24 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
                 label="Purchase Cost (PKR)" 
                 name="restock-cost" 
                 type="number" 
+                min="0"
                 value={restockForm.purchaseCost} 
                 onChange={(v: string) => setRestockForm({ ...restockForm, purchaseCost: v })} 
                 required 
               />
+            </div>
+
+            {/* REALTIME TOTAL PURCHASE COST BANNER */}
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-emerald-950 flex justify-between items-center">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">Total Purchase Cost</div>
+                <div className="text-xs text-emerald-800">
+                  {restockForm.quantity || 0} units × PKR {Number(restockForm.purchaseCost || 0).toLocaleString()}
+                </div>
+              </div>
+              <div className="text-xl font-extrabold font-mono text-emerald-800">
+                {money(computedTotalCost)}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -375,17 +409,27 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
                 label="Selling Price (PKR)" 
                 name="restock-sell" 
                 type="number" 
+                min="0"
                 value={restockForm.sellingPrice} 
                 onChange={(v: string) => setRestockForm({ ...restockForm, sellingPrice: v })} 
                 required 
               />
-              <Field 
-                label="Amount Paid to Supplier" 
-                name="restock-paid" 
-                type="number" 
-                value={restockForm.paidAmount} 
-                onChange={(v: string) => setRestockForm({ ...restockForm, paidAmount: v })} 
-              />
+              <div>
+                <Field 
+                  label="Amount Paid to Supplier" 
+                  name="restock-paid" 
+                  type="number" 
+                  min="0"
+                  max={computedTotalCost}
+                  value={restockForm.paidAmount} 
+                  onChange={(v: string) => setRestockForm({ ...restockForm, paidAmount: v })} 
+                />
+                {Number(restockForm.paidAmount) < computedTotalCost && (
+                  <div className="mt-1 text-[11px] font-semibold text-amber-600">
+                    Remaining Balance: {money(computedTotalCost - Number(restockForm.paidAmount))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <Field 
