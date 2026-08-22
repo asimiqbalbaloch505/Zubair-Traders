@@ -73,7 +73,14 @@ export function Buyers({
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data = { ...form, creditLimit: Number(form.creditLimit) };
+    const data = { 
+      name: form.name,
+      phone: form.phone,
+      cnic: form.cnic,
+      address: form.address,
+      credit_limit: Number(form.creditLimit || 0),
+      creditLimit: Number(form.creditLimit || 0)
+    };
     const finish = () => {
       qc.invalidateQueries({ queryKey: getGetBuyersQueryKey() });
       setModal(false);
@@ -93,9 +100,11 @@ export function Buyers({
     collectPayment.mutate(
       {
         buyerId: selectedBuyer.id,
+        buyer_id: selectedBuyer.id,
         amount: Number(paymentForm.amount),
         notes: paymentForm.notes,
         paymentMethod: paymentForm.paymentMethod,
+        payment_method: paymentForm.paymentMethod
       },
       {
         onSuccess: () => {
