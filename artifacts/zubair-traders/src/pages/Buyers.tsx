@@ -48,6 +48,30 @@ export function Buyers({
   const blank = { name: '', phone: '', cnic: '', address: '', creditLimit: '' };
   const [form, setForm] = useState(blank);
 
+  // Helper map to calculate real-time live balances per buyer
+  const buyerBalances = useMemo(() => {
+    const balances: Record<string, number> = {};
+
+    // 1. Add total invoice sales amounts minus paid amounts at sale creation
+    (salesQuery.data || []).forEach((s: any) => {
+      const bId = String(s.buyerId || s.buyer_id || '');
+      if (!bId) return;
+      const total = Number(s.totalAmount ?? s.total_amount ?? 0);
+      const paidAtSale = Number(s.paidAmount ?? s.paid_amount ?? 0);
+      balances[bId] = (balances[bId] || 0) + (total - paidAtSale);
+    });
+
+    // 2. Subtract subsequent udhaar payments
+    (buyerPaymentsQuery.data || []).forEach((p: any) => {
+      const bId = String(p.buyerId || p.buyer_id || '');
+      if (!bId) return;
+      const paymentAmt = Number(p.amount || 0);
+      balances[bId] = (balances[bId] || 0) - paymentAmt;
+    });
+
+    return balances;
+  }, [salesQuery.data, buyerPaymentsQuery.data]);
+
   const list = useMemo(() => {
     return (q.data || []).filter((b: any) => 
       `${b.name} ${b.phone}`.toLowerCase().includes(search.toLowerCase())
@@ -55,8 +79,11 @@ export function Buyers({
   }, [q.data, search]);
 
   const totalReceivables = useMemo(() => {
-    return (q.data || []).reduce((acc: number, b: any) => acc + Number(b.currentBalance ?? b.current_balance ?? 0), 0);
-  }, [q.data]);
+    return (q.data || []).reduce((acc: number, b: any) => {
+      const liveBalance = buyerBalances[String(b.id)] ?? Number(b.currentBalance ?? b.current_balance ?? 0);
+      return acc + Math.max(0, liveBalance);
+    }, 0);
+  }, [q.data, buyerBalances]);
 
   // Combined ledger history for the selected customer
   const buyerHistoryRecords = useMemo(() => {
@@ -160,7 +187,7 @@ export function Buyers({
       },
       {
         onSuccess: () => {
-          qc.invalidateQueries({ queryKey: getGetBuyersQueryKey() });
+          qc.invalidateQueries();
           setPaymentModal(false);
           setSelectedBuyer(null);
           setPaymentForm({ amount: '', notes: '', paymentMethod: 'Cash' });
@@ -232,7 +259,7 @@ export function Buyers({
               </thead>
               <tbody className="divide-y divide-border/70">
                 {list.map((b: any) => {
-                  const balance = b.currentBalance ?? b.current_balance ?? 0;
+                  const balance = buyerBalances[String(b.id)] ?? Number(b.currentBalance ?? b.current_balance ?? 0);
                   const limit = b.creditLimit ?? b.credit_limit ?? 0;
 
                   return (
@@ -325,7 +352,7 @@ export function Buyers({
             <div className="rounded-lg bg-muted p-3 text-sm">
               <div className="text-xs text-muted-foreground">Current Udhaar Balance</div>
               <div className="text-lg font-bold text-accent font-mono">
-                {money(selectedBuyer.currentBalance ?? selectedBuyer.current_balance ?? 0)}
+                {money(buyerBalances[String(selectedBuyer.id)] ?? Number(selectedBuyer.currentBalance ?? selectedBuyer.current_balance ?? 0))}
               </div>
             </div>
 
@@ -386,7 +413,7 @@ export function Buyers({
               <div>
                 <div className="text-muted-foreground">Current Outstanding Balance:</div>
                 <div className="font-mono font-bold text-accent">
-                  {money(historyBuyer.currentBalance ?? historyBuyer.current_balance ?? 0)}
+                  {money(buyerBalances[String(historyBuyer.id)] ?? Number(historyBuyer.currentBalance ?? historyBuyer.current_balance ?? 0))}
                 </div>
               </div>
             </div>

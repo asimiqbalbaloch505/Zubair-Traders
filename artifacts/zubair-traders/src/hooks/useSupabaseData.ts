@@ -11,7 +11,8 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
         { data: buyers },
         { data: suppliers },
         { data: expenses },
-        { data: purchases }
+        { data: purchases },
+        { data: buyerPayments }
       ] = await Promise.all([
         supabase.from('sales_invoices').select(`
           *,
@@ -28,6 +29,7 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
         supabase.from('suppliers').select('*'),
         supabase.from('expenses').select('*'),
         supabase.from('purchase_invoices').select('*'),
+        supabase.from('buyer_payments').select('*'),
       ]);
 
       if (errSales) console.error('Sales fetch error:', errSales);
@@ -96,8 +98,12 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
           minStockAlert: p.min_stock_alert,
         }));
 
+      // Calculate true total buyer balance dynamically across all sales & payments
+      const totalUnpaidSales = (sales || []).reduce((acc, s) => acc + (Number(s.due_amount ?? s.dueAmount ?? ((s.total_amount || 0) - (s.paid_amount || 0))) || 0), 0);
+      const totalCollectedPayments = (buyerPayments || []).reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+      
       const totalBuyerReceivables = filter === 'all_time'
-        ? (buyers?.reduce((acc, b) => acc + (Number(b.current_balance ?? b.currentBalance) || 0), 0) || 0)
+        ? Math.max(0, totalUnpaidSales - totalCollectedPayments)
         : filteredSales.reduce((acc, s) => acc + (Number(s.due_amount ?? s.dueAmount ?? ((s.total_amount || 0) - (s.paid_amount || 0))) || 0), 0);
 
       const totalSupplierPayables = filter === 'all_time'
@@ -187,7 +193,7 @@ export function useGetBuyers(_options?: any) {
         cnic: b.cnic,
         address: b.address,
         creditLimit: b.credit_limit ?? b.creditLimit,
-        currentBalance: b.current_balance ?? b.currentBalance,
+        currentBalance: b.current_balance ?? b.currentBalance ?? 0,
       }));
     },
   });
@@ -203,6 +209,7 @@ export function useCreateBuyer() {
         cnic: data.cnic,
         address: data.address,
         credit_limit: data.creditLimit,
+        current_balance: 0,
       }]).select();
       if (error) throw error;
       return res;
@@ -233,9 +240,13 @@ export function useUpdateBuyer() {
 export function useCollectBuyerPayment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ buyerId, amount, notes, paymentMethod }: { buyerId: string | number; amount: number; notes?: string; paymentMethod?: string }) => {
-      // Ensure numeric/string parameters are clean
-      const parsedAmount = Number(amount);
+    mutationFn: async (payload: { buyerId?: string | number; buyer_id?: string | number; amount: number; notes?: string; paymentMethod?: string; payment_method?: string }) => {
+      const targetBuyerId = payload.buyerId || payload.buyer_id;
+      const parsedAmount = Number(payload.amount);
+
+      if (!targetBuyerId) {
+        throw new Error('Buyer ID is required.');
+      }
       if (isNaN(parsedAmount) || parsedAmount <= 0) {
         throw new Error('Please enter a valid payment amount.');
       }
@@ -245,10 +256,10 @@ export function useCollectBuyerPayment() {
         .from('buyer_payments')
         .insert([
           {
-            buyer_id: String(buyerId),
+            buyer_id: String(targetBuyerId),
             amount: parsedAmount,
-            payment_method: paymentMethod || 'Cash',
-            notes: notes || 'Udhaar Payment Collected',
+            payment_method: payload.paymentMethod || payload.payment_method || 'Cash',
+            notes: payload.notes || 'Udhaar Payment Collected',
           },
         ])
         .select()
@@ -263,7 +274,7 @@ export function useCollectBuyerPayment() {
       const { data: currentBuyer, error: buyerError } = await supabase
         .from('buyers')
         .select('current_balance')
-        .eq('id', buyerId)
+        .eq('id', targetBuyerId)
         .single();
 
       if (buyerError) {
@@ -272,13 +283,13 @@ export function useCollectBuyerPayment() {
       }
 
       // 3. Deduct payment from current balance
-      const existingBalance = Number(currentBuyer.current_balance || 0);
-      const newBalance = existingBalance - parsedAmount;
+      const existingBalance = Number(currentBuyer?.current_balance || 0);
+      const newBalance = Math.max(0, existingBalance - parsedAmount);
 
       const { error: updateError } = await supabase
         .from('buyers')
         .update({ current_balance: newBalance })
-        .eq('id', buyerId);
+        .eq('id', targetBuyerId);
 
       if (updateError) {
         console.error('Error updating buyer balance:', updateError);
@@ -290,6 +301,7 @@ export function useCollectBuyerPayment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['buyers'] });
       qc.invalidateQueries({ queryKey: ['buyer_payments'] });
+      qc.invalidateQueries({ queryKey: ['sales'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (error: any) => {
@@ -309,7 +321,7 @@ export function useGetBuyerPayments(buyerId?: string | number) {
       `).order('created_at', { ascending: false });
 
       if (buyerId) {
-        query = query.eq('buyer_id', buyerId);
+        query = query.eq('buyer_id', String(buyerId));
       }
 
       const { data, error } = await query;
@@ -333,7 +345,7 @@ export function useGetSales() {
             products(name)
           )
         `)
-        .gt('total_amount', 0) // Strictly return actual sales invoices (total_amount > 0)
+        .gt('total_amount', 0)
         .order('transaction_time', { ascending: false });
 
       if (error) {
@@ -371,6 +383,8 @@ export function useGetSales() {
           id: s.id,
           invoiceNumber: s.invoice_number ? `INV-${s.invoice_number}` : `INV-${s.id}`,
           invoice_number: s.invoice_number,
+          buyerId: s.buyer_id,
+          buyer_id: s.buyer_id,
           buyerName: s.buyers?.name || 'Walk-in',
           totalAmount: s.total_amount,
           total_amount: s.total_amount,
@@ -380,8 +394,8 @@ export function useGetSales() {
           due_amount: s.due_amount ?? ((s.total_amount || 0) - (s.paid_amount || 0)),
           paymentStatus: status,
           payment_status: status,
-          transactionTime: s.transaction_time,
-          transaction_time: s.transaction_time,
+          transactionTime: s.transaction_time || s.created_at,
+          transaction_time: s.transaction_time || s.created_at,
           notes: s.notes,
           
           items: mappedItems,
@@ -510,7 +524,7 @@ export function useGetSuppliers(_options?: any) {
         name: s.name,
         phone: s.phone,
         companyName: s.company_name,
-        currentBalance: s.current_balance,
+        currentBalance: s.current_balance || 0,
       }));
     },
   });
@@ -526,6 +540,7 @@ export function useCreateSupplier() {
         company_name: data.companyName,
         cnic: data.cnic,
         address: data.address,
+        current_balance: 0,
       }]).select();
       if (error) throw error;
       return res;
