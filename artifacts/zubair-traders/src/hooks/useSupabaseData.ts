@@ -523,7 +523,7 @@ export function useGetPurchases() {
             )
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('transaction_time', { ascending: false });
 
       if (error) {
         console.error('Purchases fetch error:', error);
@@ -567,6 +567,7 @@ export function useGetPurchases() {
           payment_status: status,
           transactionTime: p.transaction_time || p.created_at,
           transaction_time: p.transaction_time || p.created_at,
+          created_at: p.transaction_time || p.created_at,
           notes: p.notes,
           items: mappedItems,
           purchase_invoice_items: mappedItems
