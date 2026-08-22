@@ -13,12 +13,20 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
         { data: expenses },
         { data: purchases }
       ] = await Promise.all([
-        supabase.from('sales_invoices').select('*'),
+        supabase.from('sales_invoices').select(`
+          *,
+          sales_invoice_items (
+            quantity,
+            unit_price,
+            unit_cost,
+            products (default_purchase_cost)
+          )
+        `),
         supabase.from('products').select('*'),
         supabase.from('buyers').select('*'),
         supabase.from('suppliers').select('*'),
         supabase.from('expenses').select('*'),
-        supabase.from('purchase_invoices').select('*'), // FIX 1: Changed 'purchases' to 'purchase_invoices'
+        supabase.from('purchase_invoices').select('*'),
       ]);
 
       if (errSales) console.error('Sales fetch error:', errSales);
@@ -55,9 +63,37 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
       const filteredExpenses = expenses?.filter(e => isWithinFilter(e.expense_date || e.created_at)) || [];
       const filteredPurchases = purchases?.filter(p => isWithinFilter(p.transaction_time || p.created_at)) || [];
 
+      // 1. Total Sales Revenue
       const totalSales = filteredSales.reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0);
+      
+      // 2. Cost of Goods Sold (COGS)
+      const totalCogs = filteredSales.reduce((acc, s) => {
+        const items = s.sales_invoice_items || [];
+        const invoiceCogs = items.reduce((itemAcc: number, item: any) => {
+          const qty = Number(item.quantity) || 0;
+          const cost = Number(item.unit_cost ?? item.products?.default_purchase_cost ?? 0);
+          return itemAcc + (qty * cost);
+        }, 0);
+        return acc + invoiceCogs;
+      }, 0);
+
+      // 3. Operational Expenses
       const totalExpenses = filteredExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
-      const netProfit = totalSales - totalExpenses;
+
+      // 4. Calculations
+      const grossProfit = totalSales - totalCogs;
+      const netProfit = grossProfit - totalExpenses;
+
+      // Low Stock items calculation
+      const lowStock = (products || [])
+        .filter(p => (p.stock_quantity ?? p.stockQuantity ?? 0) <= (p.min_stock_alert ?? p.minStockAlert ?? 5))
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          unit: p.unit,
+          stockQuantity: p.stock_quantity,
+          minStockAlert: p.min_stock_alert,
+        }));
 
       const totalBuyerReceivables = filter === 'all_time'
         ? (buyers?.reduce((acc, b) => acc + (Number(b.current_balance ?? b.currentBalance) || 0), 0) || 0)
@@ -88,7 +124,10 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
       return {
         totalSales,
         totalExpenses,
+        totalCogs,
+        grossProfit,
         netProfit,
+        lowStock,
         totalBuyerReceivables,
         totalSupplierPayables,
         salesTrend,

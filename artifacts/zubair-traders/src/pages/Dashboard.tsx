@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'wouter';
-import { Plus, Banknote, ArrowUpRight, CreditCard, Truck, Wallet, FileText, CircleDollarSign, Receipt } from 'lucide-react';
+import { Plus, Banknote, ArrowUpRight, TrendingUp, CreditCard, Truck, Wallet, FileText, CircleDollarSign, Receipt } from 'lucide-react';
 import { useGetDashboard, getGetDashboardQueryKey } from '../hooks/useSupabaseData';
 
 export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money }: any) {
@@ -18,7 +18,8 @@ export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money }: an
 
   // Property alias fallbacks to reflect dynamic filter state
   const dailySales = d?.dailySales ?? d?.totalSales ?? 0;
-  const todaysProfit = d?.todaysProfit ?? d?.netProfit ?? 0;
+  const grossProfit = d?.grossProfit ?? 0;
+  const netProfit = d?.netProfit ?? d?.todaysProfit ?? 0;
   const buyerDebt = d?.buyerDebt ?? d?.totalBuyerReceivables ?? 0;
   const supplierOwed = d?.supplierOwed ?? d?.totalSupplierPayables ?? 0;
   const cashInDrawer = d?.cashInDrawer ?? (dailySales - buyerDebt);
@@ -31,11 +32,12 @@ export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money }: an
         detail="Everything you need to move from sale to cash collection in seconds." 
         action={<Link href="/sales" data-testid="link-start-sale" className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition hover:brightness-110"><Plus size={16} /> Start a sale</Link>} 
       />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <Stat label="Today's sales" value={money(dailySales)} note="Across all invoices" icon={Banknote} />
-        <Stat label="Today's profit" value={money(todaysProfit)} note="After product cost" icon={ArrowUpRight} tone="warning" />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <Stat label="Total sales" value={money(dailySales)} note="Across all invoices" icon={Banknote} />
+        <Stat label="Gross profit" value={money(grossProfit)} note="Sales minus COGS" icon={TrendingUp} tone="warning" />
+        <Stat label="Net profit" value={money(netProfit)} note="After shop expenses" icon={ArrowUpRight} tone="accent" />
         <Stat label="Buyer debt" value={money(buyerDebt)} note="Collect when you can" icon={CreditCard} tone="accent" />
-        <Stat label="Supplier owed" value={money(supplierOwed)} note="Purchase-facing balance" icon={Truck} tone="blue" />
+        <Stat label="Supplier owed" value={money(supplierOwed)} note="Purchase balance" icon={Truck} tone="blue" />
         <Stat label="Cash in drawer" value={money(cashInDrawer)} note="Expected on hand" icon={Wallet} tone="primary" />
       </div>
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_.8fr]">
