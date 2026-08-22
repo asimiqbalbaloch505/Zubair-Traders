@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'wouter';
 import { Plus, Banknote, TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, FileText, CircleDollarSign, Receipt } from 'lucide-react';
-import { useGetDashboard, getGetDashboardQueryKey } from '../hooks/useSupabaseData';
+import { useGetDashboard } from '../hooks/useSupabaseData';
 
 export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money }: any) {
   const [filter, setFilter] = useState<string>('this_week');
-  const q = useGetDashboard(filter, undefined, { query: { queryKey: getGetDashboardQueryKey() } });
+  const q = useGetDashboard(filter);
 
   if (q.isLoading) return <><PageIntro eyebrow="Operations Summary" title="Dashboard" detail="Zubair Traders cash position, sales volume, and quick actions." /><Loading rows={6} /></>;
   if (q.isError) return <><PageIntro eyebrow="Operations Summary" title="Dashboard" detail="Your command view for the day." /><Failed onRetry={() => q.refetch()} /></>;
