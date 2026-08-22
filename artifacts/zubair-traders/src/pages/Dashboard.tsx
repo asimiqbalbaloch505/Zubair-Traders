@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'wouter';
-import { Plus, Banknote, ArrowUpRight, TrendingUp, CreditCard, Truck, Wallet, FileText, CircleDollarSign, Receipt } from 'lucide-react';
+import { Plus, Banknote, TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, FileText, CircleDollarSign, Receipt } from 'lucide-react';
 import { useGetDashboard, getGetDashboardQueryKey } from '../hooks/useSupabaseData';
 
 export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money }: any) {
-  const q = useGetDashboard({ query: { queryKey: getGetDashboardQueryKey() } });
+  const [filter, setFilter] = useState<string>('this_week');
+  const q = useGetDashboard(filter, undefined, { query: { queryKey: getGetDashboardQueryKey() } });
 
-  if (q.isLoading) return <><PageIntro eyebrow="Good morning" title="The floor at a glance" detail="Loading today's rhythm…" /><Loading rows={6} /></>;
-  if (q.isError) return <><PageIntro eyebrow="Good morning" title="The floor at a glance" detail="Your command view for the day." /><Failed onRetry={() => q.refetch()} /></>;
+  if (q.isLoading) return <><PageIntro eyebrow="Operations Summary" title="Dashboard" detail="Zubair Traders cash position, sales volume, and quick actions." /><Loading rows={6} /></>;
+  if (q.isError) return <><PageIntro eyebrow="Operations Summary" title="Dashboard" detail="Your command view for the day." /><Failed onRetry={() => q.refetch()} /></>;
 
   const d = q.data;
   const trend = (d?.salesTrend || []).map((p: any) => ({
@@ -16,35 +17,56 @@ export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money }: an
   }));
   const max = Math.max(...trend.map((p: any) => p.value), 1);
 
-  // Property alias fallbacks to reflect dynamic filter state
-  const dailySales = d?.dailySales ?? d?.totalSales ?? 0;
+  // Core metrics matching backend query payload
+  const totalSales = d?.totalSales ?? 0;
   const grossProfit = d?.grossProfit ?? 0;
-  const netProfit = d?.netProfit ?? d?.todaysProfit ?? 0;
-  const buyerDebt = d?.buyerDebt ?? d?.totalBuyerReceivables ?? 0;
-  const supplierOwed = d?.supplierOwed ?? d?.totalSupplierPayables ?? 0;
-  const cashInDrawer = d?.cashInDrawer ?? (dailySales - buyerDebt);
+  const expensesLogged = d?.totalExpenses ?? 0;
+  const netProfit = d?.netProfit ?? 0;
+
+  const isLoss = netProfit < 0;
 
   return (
     <div className="animate-in">
-      <PageIntro 
-        eyebrow="Monday · morning shift" 
-        title="The floor at a glance" 
-        detail="Everything you need to move from sale to cash collection in seconds." 
-        action={<Link href="/sales" data-testid="link-start-sale" className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition hover:brightness-110"><Plus size={16} /> Start a sale</Link>} 
-      />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <Stat label="Total sales" value={money(dailySales)} note="Across all invoices" icon={Banknote} />
-        <Stat label="Gross profit" value={money(grossProfit)} note="Sales minus COGS" icon={TrendingUp} tone="warning" />
-        <Stat label="Net profit" value={money(netProfit)} note="After shop expenses" icon={ArrowUpRight} tone="accent" />
-        <Stat label="Buyer debt" value={money(buyerDebt)} note="Collect when you can" icon={CreditCard} tone="accent" />
-        <Stat label="Supplier owed" value={money(supplierOwed)} note="Purchase balance" icon={Truck} tone="blue" />
-        <Stat label="Cash in drawer" value={money(cashInDrawer)} note="Expected on hand" icon={Wallet} tone="primary" />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <PageIntro 
+          eyebrow="OPERATIONS SUMMARY" 
+          title="Dashboard" 
+          detail="Zubair Traders cash position, sales volume, and quick actions." 
+          action={<Link href="/sales" data-testid="link-start-sale" className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition hover:brightness-110"><Plus size={16} /> Start a sale</Link>} 
+        />
+        <div className="self-start sm:self-center">
+          <select 
+            value={filter} 
+            onChange={(e) => setFilter(e.target.value)} 
+            className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="today">Today</option>
+            <option value="this_week">This Week</option>
+            <option value="this_month">This Month</option>
+            <option value="last_month">Last Month</option>
+            <option value="this_year">This Year</option>
+            <option value="all_time">All Time</option>
+          </select>
+        </div>
       </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="TOTAL SALES" value={money(totalSales)} icon={Banknote} />
+        <Stat label="GROSS PROFIT" value={money(grossProfit)} icon={TrendingUp} tone="warning" />
+        <Stat label="EXPENSES LOGGED" value={money(expensesLogged)} icon={Wallet} />
+        <Stat 
+          label={isLoss ? "NET LOSS" : "NET PROFIT"} 
+          value={money(netProfit)} 
+          icon={isLoss ? ArrowDownRight : ArrowUpRight} 
+          tone={isLoss ? "destructive" : "accent"} 
+        />
+      </div>
+
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_.8fr]">
         <section className="panel rounded-xl p-5">
           <div className="flex items-center justify-between">
-            <div><h3 className="font-bold">Sales rhythm</h3><p className="mt-1 text-xs text-muted-foreground">Last 7 trading days</p></div>
-            <div className="rounded-md bg-secondary/30 px-2 py-1 font-mono text-[10px] font-bold text-primary">GROSS SALES</div>
+            <div><h3 className="font-bold">Weekly Sales Rhythm</h3><p className="mt-1 text-xs text-muted-foreground">Invoiced revenue over the last 7 days</p></div>
+            <div className="rounded-md bg-secondary/30 px-2 py-1 font-mono text-[10px] font-bold text-primary">LAST 7 DAYS</div>
           </div>
           <div className="mt-7 flex h-52 items-end gap-2 sm:gap-5">
             {trend.length ? trend.map((point: any, idx: number) => (
@@ -58,9 +80,10 @@ export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money }: an
             )) : <div className="w-full"><Empty title="No sales rhythm yet" detail="Your first invoice will give this chart a pulse." /></div>}
           </div>
         </section>
+
         <section className="panel rounded-xl p-5">
           <div className="flex items-start justify-between">
-            <div><h3 className="font-bold">Low stock watch</h3><p className="mt-1 text-xs text-muted-foreground">Restock before the next bake</p></div>
+            <div><h3 className="font-bold">Low stock watch</h3><p className="mt-1 text-xs text-muted-foreground">Restock before running out</p></div>
             <Link href="/products" data-testid="link-view-stock" className="text-xs font-bold text-primary hover:underline">View stock</Link>
           </div>
           <div className="mt-5 grid gap-1">
@@ -73,6 +96,7 @@ export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money }: an
           </div>
         </section>
       </div>
+
       <section className="panel mt-5 rounded-xl p-5">
         <div className="flex items-center justify-between">
           <div><h3 className="font-bold">Recent activity</h3><p className="mt-1 text-xs text-muted-foreground">What moved through the business</p></div>

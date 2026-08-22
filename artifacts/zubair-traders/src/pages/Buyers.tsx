@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Pencil } from 'lucide-react';
+import { Plus, Search, Pencil, CreditCard } from 'lucide-react';
 import { 
   useGetBuyers, 
   getGetBuyersQueryKey, 
@@ -8,7 +8,7 @@ import {
 } from '../hooks/useSupabaseData';
 import { useQueryClient } from '@tanstack/react-query';
 
-export function Buyers({ PageIntro, Button, Field, Modal, Loading, Failed, Empty, money }: any) {
+export function Buyers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed, Empty, money }: any) {
   const q = useGetBuyers({ query: { queryKey: getGetBuyersQueryKey() } });
   const create = useCreateBuyer();
   const update = useUpdateBuyer();
@@ -26,6 +26,10 @@ export function Buyers({ PageIntro, Button, Field, Modal, Loading, Failed, Empty
       `${b.name} ${b.phone}`.toLowerCase().includes(search.toLowerCase())
     );
   }, [q.data, search]);
+
+  const totalReceivables = useMemo(() => {
+    return (q.data || []).reduce((acc: number, b: any) => acc + Number(b.currentBalance ?? b.current_balance ?? 0), 0);
+  }, [q.data]);
 
   const open = (b?: any) => {
     setEditing(b || null);
@@ -70,6 +74,23 @@ export function Buyers({ PageIntro, Button, Field, Modal, Loading, Failed, Empty
           </Button>
         } 
       />
+
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Stat ? (
+          <Stat 
+            label="BUYER RECEIVABLES" 
+            value={money(totalReceivables)} 
+            note="Total outstanding customer balance" 
+            icon={CreditCard} 
+            tone="accent" 
+          />
+        ) : (
+          <div className="panel rounded-xl p-5">
+            <div className="text-xs font-bold uppercase text-muted-foreground">BUYER RECEIVABLES</div>
+            <div className="mt-2 text-2xl font-bold text-accent">{money(totalReceivables)}</div>
+          </div>
+        )}
+      </div>
 
       <div className="panel rounded-xl p-5">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

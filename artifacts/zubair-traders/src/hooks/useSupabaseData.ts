@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 
-export function useGetDashboard(filter: string = 'this_month', customMonth?: string) {
+export function useGetDashboard(filter: string = 'this_month', customMonth?: string, _options?: any) {
   return useQuery({
     queryKey: ['dashboard', filter, customMonth],
     queryFn: async () => {
@@ -15,6 +15,7 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
       ] = await Promise.all([
         supabase.from('sales_invoices').select(`
           *,
+          buyers (name),
           sales_invoice_items (
             quantity,
             unit_price,
@@ -80,11 +81,11 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
       // 3. Operational Expenses
       const totalExpenses = filteredExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
 
-      // 4. Calculations
+      // 4. Profit Calculations
       const grossProfit = totalSales - totalCogs;
       const netProfit = grossProfit - totalExpenses;
 
-      // Low Stock items calculation
+      // Low Stock Items
       const lowStock = (products || [])
         .filter(p => (p.stock_quantity ?? p.stockQuantity ?? 0) <= (p.min_stock_alert ?? p.minStockAlert ?? 5))
         .map(p => ({
@@ -121,6 +122,42 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
         return { day: dayLabel, date: dateString, value: dayTotal };
       });
 
+      // Construct dynamic Recent Activity stream
+      const saleActivities = (sales || []).map(s => {
+        const dateObj = new Date(s.transaction_time || s.created_at || Date.now());
+        const invNum = s.invoice_number ? `INV-${s.invoice_number}` : `INV-${s.id}`;
+        const buyerName = s.buyers?.name || 'Walk-in Customer';
+        const amount = Number(s.total_amount || 0);
+
+        return {
+          id: `sale-${s.id}`,
+          type: 'payment',
+          title: `Sale Recorded (${invNum})`,
+          detail: `${buyerName} • PKR ${amount.toLocaleString()}`,
+          time: dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: dateObj.getTime(),
+        };
+      });
+
+      const expenseActivities = (expenses || []).map(e => {
+        const dateObj = new Date(e.expense_date || e.created_at || Date.now());
+        const category = e.category || 'General';
+        const amount = Number(e.amount || 0);
+
+        return {
+          id: `expense-${e.id}`,
+          type: 'expense',
+          title: `Expense logged (${category})`,
+          detail: `${e.description || 'Shop expense'} • PKR ${amount.toLocaleString()}`,
+          time: dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: dateObj.getTime(),
+        };
+      });
+
+      const recentActivity = [...saleActivities, ...expenseActivities]
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 8);
+
       return {
         totalSales,
         totalExpenses,
@@ -131,6 +168,7 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
         totalBuyerReceivables,
         totalSupplierPayables,
         salesTrend,
+        recentActivity,
       };
     },
   });
@@ -483,7 +521,10 @@ export function useCreateExpense() {
       if (error) throw error;
       return res;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
 
@@ -545,7 +586,6 @@ export function useCreatePurchase() {
       const paid = Number(data.paidAmount ?? data.paid_amount ?? 0);
       const due = total - paid;
 
-      // FIX 2: Target 'purchase_invoices' instead of 'purchases'
       const { data: purchase, error: purchaseError } = await supabase.from('purchase_invoices').insert([{
         supplier_id: supplierId,
         total_amount: total,
@@ -558,7 +598,6 @@ export function useCreatePurchase() {
       if (purchaseError) throw purchaseError;
 
       if (data.items && data.items.length > 0) {
-        // FIX 3: Target 'purchase_invoice_items' table
         const lineItems = data.items.map((item: any) => ({
           purchase_id: purchase.id,
           product_id: item.productId || item.product_id,

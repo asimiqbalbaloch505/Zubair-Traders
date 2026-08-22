@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Pencil } from 'lucide-react';
+import { Plus, Search, Pencil, Truck } from 'lucide-react';
 import { 
   useGetSuppliers, 
   getGetSuppliersQueryKey, 
@@ -8,7 +8,7 @@ import {
 } from '../hooks/useSupabaseData';
 import { useQueryClient } from '@tanstack/react-query';
 
-export function Suppliers({ PageIntro, Button, Field, Modal, Loading, Failed, Empty, money }: any) {
+export function Suppliers({ PageIntro, Stat, Button, Field, Modal, Loading, Failed, Empty, money }: any) {
   const q = useGetSuppliers({ query: { queryKey: getGetSuppliersQueryKey() } });
   const create = useCreateSupplier();
   const update = useUpdateSupplier();
@@ -27,6 +27,10 @@ export function Suppliers({ PageIntro, Button, Field, Modal, Loading, Failed, Em
       return `${s.name} ${s.phone || ''} ${company}`.toLowerCase().includes(search.toLowerCase());
     });
   }, [q.data, search]);
+
+  const totalPayables = useMemo(() => {
+    return (q.data || []).reduce((acc: number, s: any) => acc + Number(s.currentBalance ?? s.current_balance ?? 0), 0);
+  }, [q.data]);
 
   const open = (s?: any) => {
     setEditing(s || null);
@@ -74,6 +78,23 @@ export function Suppliers({ PageIntro, Button, Field, Modal, Loading, Failed, Em
           </Button>
         } 
       />
+
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Stat ? (
+          <Stat 
+            label="SUPPLIER PAYABLES" 
+            value={money(totalPayables)} 
+            note="Total balance owed to vendors" 
+            icon={Truck} 
+            tone="blue" 
+          />
+        ) : (
+          <div className="panel rounded-xl p-5">
+            <div className="text-xs font-bold uppercase text-muted-foreground">SUPPLIER PAYABLES</div>
+            <div className="mt-2 text-2xl font-bold text-amber-600">{money(totalPayables)}</div>
+          </div>
+        )}
+      </div>
 
       <div className="panel rounded-xl p-5">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
