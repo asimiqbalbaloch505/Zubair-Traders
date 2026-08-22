@@ -1,33 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { FileText, Printer, Search, Filter, Calendar, X } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { useGetSales, useGetBuyerPayments } from '../hooks/useSupabaseData';
-import { supabase } from '../lib/supabase';
+import { useGetSales, useGetBuyerPayments, useGetPurchases } from '../hooks/useSupabaseData';
 
 export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
   const sales = useGetSales();
   const buyerPayments = useGetBuyerPayments();
-
-  // Query purchase_invoices directly from Supabase
-  const purchases = useQuery({
-    queryKey: ['purchases'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('purchase_invoices')
-        .select(`
-          *,
-          suppliers ( name ),
-          purchase_invoice_items (
-            *,
-            products ( name )
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data;
-    },
-  });
+  const purchases = useGetPurchases();
 
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,7 +54,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
     });
 
     const purchaseList = (purchases.data || []).map((pur: any) => {
-      const supplierName = pur.suppliers?.name || pur.supplier_name || 'Walk-in / Cash Purchase';
+      const supplierName = pur.supplierName || pur.suppliers?.name || pur.supplier_name || 'Walk-in / Cash Purchase';
       const purNo = pur.id ? `PUR-${pur.id}` : 'PUR-INV';
 
       return {
@@ -86,16 +64,16 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
         invoice_number: purNo,
         buyerName: supplierName,
         buyer_name: supplierName,
-        created_at: pur.created_at || pur.transaction_time,
-        transactionTime: pur.created_at || pur.transaction_time,
-        totalAmount: Number(pur.total_amount || 0),
-        total_amount: Number(pur.total_amount || 0),
-        paidAmount: Number(pur.paid_amount || 0),
-        paid_amount: Number(pur.paid_amount || 0),
-        dueAmount: Number(pur.due_amount || 0),
-        due_amount: Number(pur.due_amount || 0),
-        paymentStatus: pur.payment_status || 'paid',
-        payment_status: pur.payment_status || 'paid',
+        created_at: pur.created_at || pur.transaction_time || pur.transactionTime,
+        transactionTime: pur.created_at || pur.transaction_time || pur.transactionTime,
+        totalAmount: Number(pur.totalAmount ?? pur.total_amount ?? 0),
+        total_amount: Number(pur.totalAmount ?? pur.total_amount ?? 0),
+        paidAmount: Number(pur.paidAmount ?? pur.paid_amount ?? 0),
+        paid_amount: Number(pur.paidAmount ?? pur.paid_amount ?? 0),
+        dueAmount: Number(pur.dueAmount ?? pur.due_amount ?? 0),
+        due_amount: Number(pur.dueAmount ?? pur.due_amount ?? 0),
+        paymentStatus: pur.paymentStatus || pur.payment_status || 'paid',
+        payment_status: pur.paymentStatus || pur.payment_status || 'paid',
         recordType: 'purchase',
         displayType: 'Purchase',
         items: pur.items || pur.purchase_invoice_items || [],
@@ -111,10 +89,8 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
 
   const filteredInvoices = useMemo(() => {
     return combinedRecords.filter((inv: any) => {
-      // Type filtering
       if (typeFilter !== 'all' && inv.recordType !== typeFilter) return false;
 
-      // Status filtering
       const status = String(inv.paymentStatus || inv.payment_status || '').toLowerCase();
       if (statusFilter !== 'all') {
         if (statusFilter === 'paid' && status !== 'paid') return false;
@@ -122,7 +98,6 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
         if (statusFilter === 'unpaid' && status !== 'unpaid' && status !== 'due') return false;
       }
 
-      // Date filtering (YYYY-MM-DD)
       if (dateFilter) {
         const rawDate = inv.created_at || inv.transactionTime;
         if (!rawDate) return false;
@@ -130,7 +105,6 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
         if (invDateStr !== dateFilter) return false;
       }
 
-      // Search query filtering
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const invNum = String(inv.invoiceNumber || inv.invoice_number || inv.id || '').toLowerCase();
@@ -157,7 +131,6 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
       />
 
       <div className="panel rounded-xl p-5 border border-border/80">
-        {/* Filters and Controls */}
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative flex-1 max-w-xs">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -175,7 +148,6 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
               <Filter size={14} /> Filter:
             </div>
 
-            {/* Date Filter */}
             <div className="relative flex items-center">
               <Calendar size={14} className="absolute left-2.5 text-muted-foreground pointer-events-none" />
               <input
@@ -220,7 +192,6 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
           </div>
         </div>
 
-        {/* Invoice List Table */}
         <div className="overflow-x-auto">
           {isLoading ? (
             <Loading />
@@ -311,7 +282,6 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
         </div>
       </div>
 
-      {/* Invoice Detail View Modal */}
       {selectedInvoice && (
         <Modal
           title={`${selectedInvoice.displayType} #${String(
@@ -371,14 +341,14 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                     {selectedInvoice.items.map((item: any, idx: number) => (
                       <tr key={idx}>
                         <td className="py-1.5 font-medium">
-                          {item.products?.name || item.productName || item.product_name || `Product #${item.product_id}`}
+                          {item.productName || item.product_name || item.name || item.products?.name || `Product #${item.product_id}`}
                         </td>
-                        <td className="py-1.5 text-center">{item.quantity}</td>
+                        <td className="py-1.5 text-center">{item.quantity || item.qty || 0}</td>
                         <td className="py-1.5 text-right">
                           {money(item.purchase_cost ?? item.unitCost ?? item.unitPrice ?? item.unit_price ?? 0)}
                         </td>
                         <td className="py-1.5 text-right font-mono">
-                          {money(item.subtotal ?? item.totalPrice ?? item.total_price ?? (item.quantity * (item.purchase_cost || 0)))}
+                          {money(item.subtotal ?? item.totalPrice ?? item.total_price ?? ((item.quantity || 0) * (item.purchase_cost || item.unitCost || 0)))}
                         </td>
                       </tr>
                     ))}
