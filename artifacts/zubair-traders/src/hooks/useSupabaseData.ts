@@ -504,6 +504,200 @@ export function useCreateSale() {
   });
 }
 
+export function useGetPurchases() {
+  return useQuery({
+    queryKey: ['purchases'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('purchase_invoices')
+        .select(`
+          *,
+          suppliers(name, company_name),
+          purchase_invoice_items(
+            *,
+            products(name)
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Purchases fetch error:', error);
+        throw error;
+      }
+
+      return (data || []).map((p: any) => {
+        let status = String(p.payment_status || 'unpaid').toLowerCase();
+        if (status === 'partially_paid' || status === 'partially paid') status = 'partial';
+        if (status === 'due') status = 'unpaid';
+
+        const mappedItems = (p.purchase_invoice_items || []).map((item: any) => {
+          const pName = item.products?.name || item.product_name || 'Item';
+          return {
+            id: item.id,
+            productId: item.product_id,
+            product_id: item.product_id,
+            productName: pName,
+            product_name: pName,
+            name: pName,
+            quantity: item.quantity,
+            qty: item.quantity,
+            unitCost: item.purchase_cost,
+            unit_cost: item.purchase_cost,
+            subtotal: item.subtotal || (item.quantity * item.purchase_cost),
+          };
+        });
+
+        return {
+          id: p.id,
+          supplierId: p.supplier_id,
+          supplier_id: p.supplier_id,
+          supplierName: p.suppliers?.name || p.suppliers?.company_name || 'General Supplier',
+          totalAmount: p.total_amount,
+          total_amount: p.total_amount,
+          paidAmount: p.paid_amount,
+          paid_amount: p.paid_amount,
+          dueAmount: p.due_amount ?? ((p.total_amount || 0) - (p.paid_amount || 0)),
+          due_amount: p.due_amount ?? ((p.total_amount || 0) - (p.paid_amount || 0)),
+          paymentStatus: status,
+          payment_status: status,
+          transactionTime: p.transaction_time || p.created_at,
+          transaction_time: p.transaction_time || p.created_at,
+          notes: p.notes,
+          items: mappedItems,
+          purchase_invoice_items: mappedItems
+        };
+      });
+    },
+  });
+}
+
+export function useCreatePurchase() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ data }: { data: any }) => {
+      const rawSupplierId = data.supplierId || data.supplier_id;
+      const supplierId = rawSupplierId && String(rawSupplierId).trim() !== '' ? rawSupplierId : null;
+
+      let calculatedTotal = Number(data.totalAmount ?? data.total_amount ?? 0);
+      if (data.items && data.items.length > 0) {
+        calculatedTotal = data.items.reduce((sum: number, item: any) => {
+          const qty = Number(item.quantity || item.qty || 1);
+          const cost = Number(item.unitCost || item.purchase_cost || 0);
+          return sum + (qty * cost);
+        }, 0);
+      }
+
+      const paid = Number(data.paidAmount ?? data.paid_amount ?? 0);
+      const due = Math.max(0, calculatedTotal - paid);
+
+      let paymentStatus = 'DUE';
+      if (paid >= calculatedTotal && calculatedTotal > 0) {
+        paymentStatus = 'PAID';
+      } else if (paid > 0) {
+        paymentStatus = 'PARTIALLY_PAID';
+      }
+
+      const { data: purchase, error: purchaseError } = await supabase.from('purchase_invoices').insert([{
+        supplier_id: supplierId,
+        total_amount: calculatedTotal,
+        paid_amount: paid,
+        due_amount: due,
+        payment_status: paymentStatus,
+        notes: data.notes || null,
+        transaction_time: new Date().toISOString(),
+      }]).select().single();
+
+      if (purchaseError) {
+        console.error('purchase_invoices insert error detail:', purchaseError);
+        throw purchaseError;
+      }
+
+      if (data.items && data.items.length > 0) {
+        const lineItems = data.items.map((item: any) => {
+          const qty = Number(item.quantity || item.qty || 1);
+          const cost = Number(item.unitCost || item.purchase_cost || 0);
+          const rawProdId = item.productId || item.product_id;
+          
+          return {
+            purchase_id: purchase.id,
+            product_id: isNaN(Number(rawProdId)) ? rawProdId : Number(rawProdId),
+            quantity: qty,
+            purchase_cost: cost,
+            subtotal: Number(item.subtotal || item.totalPrice || (qty * cost))
+          };
+        });
+
+        const { error: purchaseItemsError } = await supabase.from('purchase_invoice_items').insert(lineItems);
+        if (purchaseItemsError) {
+          console.error('purchase_invoice_items insert error detail:', purchaseItemsError);
+          throw purchaseItemsError;
+        }
+
+        for (const item of data.items) {
+          const prodId = item.productId || item.product_id;
+          const qtyPurchased = Number(item.quantity || item.qty || 1);
+          const newCost = Number(item.unitCost || item.purchase_cost || 0);
+          const newSell = Number(item.unitPrice || item.unit_price || 0);
+
+          const { data: currentProd, error: prodErr } = await supabase
+            .from('products')
+            .select('stock_quantity')
+            .eq('id', prodId)
+            .single();
+
+          if (prodErr) throw prodErr;
+
+          if (currentProd) {
+            const newStock = Number(currentProd.stock_quantity || 0) + qtyPurchased;
+            
+            const updatePayload: any = { stock_quantity: newStock };
+            if (newCost > 0) updatePayload.default_purchase_cost = newCost;
+            if (newSell > 0) updatePayload.default_selling_price = newSell;
+
+            const { error: updateStockErr } = await supabase
+              .from('products')
+              .update(updatePayload)
+              .eq('id', prodId);
+
+            if (updateStockErr) throw updateStockErr;
+          }
+        }
+      }
+
+      if (supplierId && due > 0) {
+        const { data: currentSupplier, error: supplierErr } = await supabase
+          .from('suppliers')
+          .select('current_balance')
+          .eq('id', supplierId)
+          .single();
+
+        if (supplierErr) throw supplierErr;
+
+        if (currentSupplier) {
+          const updatedBalance = Number(currentSupplier.current_balance || 0) + due;
+          const { error: updateSupplierErr } = await supabase
+            .from('suppliers')
+            .update({ current_balance: updatedBalance })
+            .eq('id', supplierId);
+
+          if (updateSupplierErr) throw updateSupplierErr;
+        }
+      }
+
+      return purchase;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchases'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['suppliers'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+    onError: (error: any) => {
+      alert(`Restock Failed: ${error.message || 'Database validation error'}`);
+    }
+  });
+}
+
 export function useGetSuppliers(_options?: any) {
   return useQuery({
     queryKey: ['suppliers'],
@@ -682,143 +876,11 @@ export function useHealthCheck(_options?: any) {
   });
 }
 
-
-  export function useCreatePurchase() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ data }: { data: any }) => {
-      // 1. Sanitize supplierId: convert empty string to null
-      const rawSupplierId = data.supplierId || data.supplier_id;
-      const supplierId = rawSupplierId && String(rawSupplierId).trim() !== '' ? rawSupplierId : null;
-
-      // 2. Calculate Realtime Total Cost if items are provided
-      let calculatedTotal = Number(data.totalAmount ?? data.total_amount ?? 0);
-      if (data.items && data.items.length > 0) {
-        calculatedTotal = data.items.reduce((sum: number, item: any) => {
-          const qty = Number(item.quantity || item.qty || 1);
-          const cost = Number(item.unitCost || item.purchase_cost || 0);
-          return sum + (qty * cost);
-        }, 0);
-      }
-
-      const paid = Number(data.paidAmount ?? data.paid_amount ?? 0);
-      const due = Math.max(0, calculatedTotal - paid);
-
-      // 3. Determine payment_status to satisfy NOT-NULL constraint
-      let paymentStatus = 'DUE';
-      if (paid >= calculatedTotal && calculatedTotal > 0) {
-        paymentStatus = 'PAID';
-      } else if (paid > 0) {
-        paymentStatus = 'PARTIALLY_PAID';
-      }
-
-      // 4. Insert purchase invoice
-      const { data: purchase, error: purchaseError } = await supabase.from('purchase_invoices').insert([{
-        supplier_id: supplierId,
-        total_amount: calculatedTotal,
-        paid_amount: paid,
-        due_amount: due,
-        payment_status: paymentStatus,
-        notes: data.notes || null,
-        transaction_time: new Date().toISOString(),
-      }]).select().single();
-
-      if (purchaseError) {
-        console.error('purchase_invoices insert error detail:', purchaseError);
-        throw purchaseError;
-      }
-
-      // 5. Insert purchase items and update product stock/pricing
-      if (data.items && data.items.length > 0) {
-        const lineItems = data.items.map((item: any) => {
-          const qty = Number(item.quantity || item.qty || 1);
-          const cost = Number(item.unitCost || item.purchase_cost || 0);
-          const rawProdId = item.productId || item.product_id;
-          
-          return {
-            purchase_id: purchase.id,
-            product_id: isNaN(Number(rawProdId)) ? rawProdId : Number(rawProdId),
-            quantity: qty,
-            purchase_cost: cost,
-            subtotal: Number(item.subtotal || item.totalPrice || (qty * cost))
-          };
-        });
-
-        const { error: purchaseItemsError } = await supabase.from('purchase_invoice_items').insert(lineItems);
-        if (purchaseItemsError) {
-          console.error('purchase_invoice_items insert error detail:', purchaseItemsError);
-          throw purchaseItemsError;
-        }
-
-        for (const item of data.items) {
-          const prodId = item.productId || item.product_id;
-          const qtyPurchased = Number(item.quantity || item.qty || 1);
-          const newCost = Number(item.unitCost || item.purchase_cost || 0);
-          const newSell = Number(item.unitPrice || item.unit_price || 0);
-
-          const { data: currentProd, error: prodErr } = await supabase
-            .from('products')
-            .select('stock_quantity')
-            .eq('id', prodId)
-            .single();
-
-          if (prodErr) throw prodErr;
-
-          if (currentProd) {
-            const newStock = Number(currentProd.stock_quantity || 0) + qtyPurchased;
-            
-            const updatePayload: any = { stock_quantity: newStock };
-            if (newCost > 0) updatePayload.default_purchase_cost = newCost;
-            if (newSell > 0) updatePayload.default_selling_price = newSell;
-
-            const { error: updateStockErr } = await supabase
-              .from('products')
-              .update(updatePayload)
-              .eq('id', prodId);
-
-            if (updateStockErr) throw updateStockErr;
-          }
-        }
-      }
-
-      // 6. Update Supplier Payable Balance when due balance remains
-      if (supplierId && due > 0) {
-        const { data: currentSupplier, error: supplierErr } = await supabase
-          .from('suppliers')
-          .select('current_balance')
-          .eq('id', supplierId)
-          .single();
-
-        if (supplierErr) throw supplierErr;
-
-        if (currentSupplier) {
-          const updatedBalance = Number(currentSupplier.current_balance || 0) + due;
-          const { error: updateSupplierErr } = await supabase
-            .from('suppliers')
-            .update({ current_balance: updatedBalance })
-            .eq('id', supplierId);
-
-          if (updateSupplierErr) throw updateSupplierErr;
-        }
-      }
-
-      return purchase;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['purchases'] });
-      qc.invalidateQueries({ queryKey: ['products'] });
-      qc.invalidateQueries({ queryKey: ['suppliers'] });
-      qc.invalidateQueries({ queryKey: ['dashboard'] });
-    },
-    onError: (error: any) => {
-      alert(`Restock Failed: ${error.message || 'Database validation error'}`);
-    }
-  });
-}
-
+// Query Key Helpers
 export const getGetDashboardQueryKey = () => ['dashboard'];
 export const getGetBuyersQueryKey = () => ['buyers'];
 export const getGetSalesQueryKey = () => ['sales'];
+export const getGetPurchasesQueryKey = () => ['purchases'];
 export const getGetBuyerPaymentsQueryKey = (buyerId?: string | number) => ['buyer_payments', buyerId];
 export const getGetSuppliersQueryKey = () => ['suppliers'];
 export const getGetProductsQueryKey = () => ['products'];
