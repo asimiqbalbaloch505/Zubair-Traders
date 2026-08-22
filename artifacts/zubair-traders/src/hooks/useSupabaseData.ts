@@ -512,10 +512,15 @@ export function useGetPurchases() {
         .from('purchase_invoices')
         .select(`
           *,
-          suppliers(name, company_name),
-          purchase_invoice_items(
+          suppliers (
+            name,
+            company_name
+          ),
+          purchase_invoice_items (
             *,
-            products(name)
+            products (
+              name
+            )
           )
         `)
         .order('created_at', { ascending: false });
