@@ -298,7 +298,6 @@ export function useCollectBuyerPayment() {
   });
 }
 
-
 // Fetch payment history receipts for a specific buyer or all buyers
 export function useGetBuyerPayments(buyerId?: string | number) {
   return useQuery({
@@ -439,45 +438,53 @@ export function useCreateSale() {
         }));
 
         const { error: itemsError } = await supabase.from('sales_invoice_items').insert(lineItems);
-        if (itemsError) console.error('Item insertion failed:', itemsError.message);
+        if (itemsError) throw itemsError;
 
         // Inventory Stock Deduction
         for (const item of data.items) {
           const prodId = item.productId || item.product_id;
           const qtySold = Number(item.quantity || item.qty || 1);
 
-          const { data: currentProd } = await supabase
+          const { data: currentProd, error: prodErr } = await supabase
             .from('products')
             .select('stock_quantity')
             .eq('id', prodId)
             .single();
 
+          if (prodErr) throw prodErr;
+
           if (currentProd) {
             const currentStock = Number(currentProd.stock_quantity || 0);
             const newStock = Math.max(currentStock - qtySold, 0);
 
-            await supabase
+            const { error: updateProdErr } = await supabase
               .from('products')
               .update({ stock_quantity: newStock })
               .eq('id', prodId);
+
+            if (updateProdErr) throw updateProdErr;
           }
         }
       }
 
       // 3. Update Buyer Balance (if due exists and buyer assigned)
       if (buyerId && due > 0) {
-        const { data: currentBuyer } = await supabase
+        const { data: currentBuyer, error: buyerErr } = await supabase
           .from('buyers')
           .select('current_balance')
           .eq('id', buyerId)
           .single();
 
+        if (buyerErr) throw buyerErr;
+
         if (currentBuyer) {
           const updatedBalance = Number(currentBuyer.current_balance || 0) + due;
-          await supabase
+          const { error: updateBuyerErr } = await supabase
             .from('buyers')
             .update({ current_balance: updatedBalance })
             .eq('id', buyerId);
+
+          if (updateBuyerErr) throw updateBuyerErr;
         }
       }
 
@@ -698,41 +705,50 @@ export function useCreatePurchase() {
           subtotal: Number(item.subtotal || item.totalPrice || 0)
         }));
 
-        await supabase.from('purchase_invoice_items').insert(lineItems);
+        const { error: purchaseItemsError } = await supabase.from('purchase_invoice_items').insert(lineItems);
+        if (purchaseItemsError) throw purchaseItemsError;
 
         for (const item of data.items) {
           const prodId = item.productId || item.product_id;
           const qtyPurchased = Number(item.quantity || item.qty || 1);
 
-          const { data: currentProd } = await supabase
+          const { data: currentProd, error: prodErr } = await supabase
             .from('products')
             .select('stock_quantity')
             .eq('id', prodId)
             .single();
 
+          if (prodErr) throw prodErr;
+
           if (currentProd) {
             const newStock = Number(currentProd.stock_quantity || 0) + qtyPurchased;
-            await supabase
+            const { error: updateStockErr } = await supabase
               .from('products')
               .update({ stock_quantity: newStock })
               .eq('id', prodId);
+
+            if (updateStockErr) throw updateStockErr;
           }
         }
       }
 
       if (supplierId && due > 0) {
-        const { data: currentSupplier } = await supabase
+        const { data: currentSupplier, error: supplierErr } = await supabase
           .from('suppliers')
           .select('current_balance')
           .eq('id', supplierId)
           .single();
 
+        if (supplierErr) throw supplierErr;
+
         if (currentSupplier) {
           const updatedBalance = Number(currentSupplier.current_balance || 0) + due;
-          await supabase
+          const { error: updateSupplierErr } = await supabase
             .from('suppliers')
             .update({ current_balance: updatedBalance })
             .eq('id', supplierId);
+
+          if (updateSupplierErr) throw updateSupplierErr;
         }
       }
 
