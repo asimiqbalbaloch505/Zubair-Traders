@@ -157,36 +157,51 @@ export function CustomerLedger({
           )}
         </div>
 
-        {currentBuyer && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-            <div className="rounded-lg bg-muted/50 p-4 border border-border">
-              <div className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
-                <FileText size={14} /> Total Invoiced
-              </div>
-              <div className="mt-2 text-xl font-bold font-mono">
-                {money(buyerInvoices.reduce((acc: number, i: any) => acc + Number(i.totalAmount ?? i.total_amount ?? 0), 0))}
-              </div>
-            </div>
+        {currentBuyer && (() => {
+          // Calculate down payments made at the time of invoice creation
+          const invoiceDownPayments = buyerInvoices.reduce((acc: number, i: any) => {
+            return acc + Number(i.paidAmount ?? i.paid_amount ?? 0);
+          }, 0);
 
-            <div className="rounded-lg bg-emerald-500/10 p-4 border border-emerald-500/20">
-              <div className="text-xs font-semibold uppercase text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                <ArrowDownLeft size={14} /> Total Collected
-              </div>
-              <div className="mt-2 text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
-                {money(buyerPayments.reduce((acc: number, p: any) => acc + Number(p.amount ?? 0), 0))}
-              </div>
-            </div>
+          // Calculate direct payment collections
+          const directCollections = buyerPayments.reduce((acc: number, p: any) => {
+            return acc + Number(p.amount ?? 0);
+          }, 0);
 
-            <div className="rounded-lg bg-accent/10 p-4 border border-accent/20">
-              <div className="text-xs font-semibold uppercase text-accent flex items-center gap-1.5">
-                <Wallet size={14} /> Current Udhaar Due
+          const totalInvoiced = buyerInvoices.reduce((acc: number, i: any) => acc + Number(i.totalAmount ?? i.total_amount ?? 0), 0);
+          const totalCollected = invoiceDownPayments + directCollections;
+
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              <div className="rounded-lg bg-muted/50 p-4 border border-border">
+                <div className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
+                  <FileText size={14} /> Total Invoiced
+                </div>
+                <div className="mt-2 text-xl font-bold font-mono">
+                  {money(totalInvoiced)}
+                </div>
               </div>
-              <div className="mt-2 text-xl font-bold font-mono text-accent">
-                {money(currentBuyer.currentBalance ?? currentBuyer.current_balance ?? 0)}
+
+              <div className="rounded-lg bg-emerald-500/10 p-4 border border-emerald-500/20">
+                <div className="text-xs font-semibold uppercase text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <ArrowDownLeft size={14} /> Total Collected
+                </div>
+                <div className="mt-2 text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                  {money(totalCollected)}
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-accent/10 p-4 border border-accent/20">
+                <div className="text-xs font-semibold uppercase text-accent flex items-center gap-1.5">
+                  <Wallet size={14} /> Current Udhaar Due
+                </div>
+                <div className="mt-2 text-xl font-bold font-mono text-accent">
+                  {money(currentBuyer.currentBalance ?? currentBuyer.current_balance ?? 0)}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Filter and Ledger Table */}
