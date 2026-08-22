@@ -8,12 +8,12 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
   const sales = useGetSales();
   const buyerPayments = useGetBuyerPayments();
 
-  // Query purchases directly from Supabase to prevent build export missing errors
+  // Query purchase_invoices directly from Supabase
   const purchases = useQuery({
     queryKey: ['purchases'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('purchases')
+        .from('purchase_invoices')
         .select(`
           *,
           suppliers ( name ),
