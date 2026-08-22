@@ -1,28 +1,29 @@
 import React, { useState, useMemo } from 'react';
-import { FileText, Printer, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Plus, CreditCard } from 'lucide-react';
-import { useGetSales, useGetBuyers, useGetBuyerPayments, useAddBuyerPayment } from '../hooks/useSupabaseData';
+import { FileText, Printer, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Plus } from 'lucide-react';
+import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
+import { supabase } from '../lib/supabase'; // Using supabase directly to prevent export errors
 
 export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
   const sales = useGetSales();
   const buyers = useGetBuyers();
   const payments = useGetBuyerPayments();
-  const addPaymentMutation = useAddBuyerPayment();
 
   const [selectedBuyerId, setSelectedBuyerId] = useState<string>('');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');
 
-  // Payment Modal State
+  // Payment Modal & Submitting state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     buyerId: '',
     amount: '',
-    paymentType: 'partial', // 'partial' | 'complete'
+    paymentType: 'partial',
     notes: '',
   });
 
-  // 1. Calculate Ledger Metrics per Buyer
+  // Calculate Ledger Metrics per Buyer
   const buyerLedgerData = useMemo(() => {
     if (!buyers.data) return [];
 
@@ -159,7 +160,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     return { totalSales, totalCollected, totalUdhaar };
   }, [activeBuyer, buyerLedgerData]);
 
-  // Open Payment Modal Pre-filling selected customer
+  // Handle Opening Modal
   const handleOpenPaymentModal = () => {
     const targetBuyer = activeBuyer || (buyerLedgerData.length > 0 ? buyerLedgerData[0] : null);
     setPaymentForm({
@@ -171,7 +172,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     setIsPaymentModalOpen(true);
   };
 
-  // Handle buyer change in modal
   const handleModalBuyerChange = (bId: string) => {
     const buyerObj = buyerLedgerData.find((b: any) => String(b.id) === String(bId));
     setPaymentForm((prev) => ({
@@ -181,7 +181,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     }));
   };
 
-  // Handle payment type change in modal (Partial vs Complete)
   const handlePaymentTypeChange = (type: string) => {
     const buyerObj = buyerLedgerData.find((b: any) => String(b.id) === String(paymentForm.buyerId));
     setPaymentForm((prev) => ({
@@ -191,21 +190,31 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     }));
   };
 
-  // Submit Payment Record
+  // Submit Payment directly via Supabase
   const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!paymentForm.buyerId || !paymentForm.amount || Number(paymentForm.amount) <= 0) return;
 
+    setIsSubmittingPayment(true);
     try {
-      await addPaymentMutation.mutateAsync({
-        buyer_id: paymentForm.buyerId,
-        amount: Number(paymentForm.amount),
-        notes: paymentForm.notes,
-        payment_date: new Date().toISOString(),
-      });
+      const { error } = await supabase.from('buyer_payments').insert([
+        {
+          buyer_id: paymentForm.buyerId,
+          amount: Number(paymentForm.amount),
+          notes: paymentForm.notes,
+          payment_date: new Date().toISOString(),
+        },
+      ]);
+
+      if (error) throw error;
+
+      // Refetch payment data
+      if (payments.refetch) payments.refetch();
       setIsPaymentModalOpen(false);
     } catch (err) {
-      console.error('Failed to submit payment:', err);
+      console.error('Error inserting payment:', err);
+    } finally {
+      setIsSubmittingPayment(false);
     }
   };
 
@@ -220,7 +229,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         detail="View customer credit balances, collections history, and itemized invoice details."
       />
 
-      {/* Dropdown Customer Selector + Action Button */}
+      {/* Customer Selector & Payment Action */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div className="w-full sm:w-80">
           <label className="block text-xs font-semibold text-muted-foreground mb-1">
@@ -245,7 +254,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         </Button>
       </div>
 
-      {/* Summary Cards: Total Sales, Collected, Udhaar */}
+      {/* Metric Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-4">
           <span className="text-xs text-muted-foreground">Total Sales</span>
@@ -265,7 +274,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         </div>
       </div>
 
-      {/* Search & Date Filters */}
+      {/* Search & Filters */}
       <div className="panel rounded-xl border border-border/80 p-5 space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 max-w-xs">
@@ -299,7 +308,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
           </div>
         </div>
 
-        {/* Transactions / Invoices Table */}
+        {/* Transactions Table */}
         <div className="overflow-x-auto">
           {transactionsList.length > 0 ? (
             <table className="w-full min-w-[600px] text-left text-sm">
@@ -375,7 +384,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         </div>
       </div>
 
-      {/* Record Payment Modal */}
+      {/* Modal: Record Udhaar Payment */}
       {isPaymentModalOpen && (
         <Modal
           title="Record Udhaar Collection"
@@ -457,8 +466,8 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
               <Button type="button" variant="outline" onClick={() => setIsPaymentModalOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={addPaymentMutation.isPending}>
-                {addPaymentMutation.isPending ? 'Saving...' : 'Save Payment'}
+              <Button type="submit" disabled={isSubmittingPayment}>
+                {isSubmittingPayment ? 'Saving...' : 'Save Payment'}
               </Button>
             </div>
           </form>
