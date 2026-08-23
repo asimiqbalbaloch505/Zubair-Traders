@@ -1,13 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Plus, Check, X, Printer, FileText, ShoppingCart, AlertCircle, Building2
+  Plus, Check, X, Printer, FileText, ShoppingCart, AlertCircle, Building2, UserPlus
 } from 'lucide-react';
 import { 
   useGetSales, getGetSalesQueryKey, 
   useGetBuyers, getGetBuyersQueryKey, 
   useGetProducts, getGetProductsQueryKey, 
   getGetDashboardQueryKey,
-  useCreateSale 
+  useCreateSale,
+  useCreateBuyer
 } from '../hooks/useSupabaseData';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -200,6 +201,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
   const products = useGetProducts({ query: { queryKey: getGetProductsQueryKey() } });
   
   const create = useCreateSale();
+  const createBuyer = useCreateBuyer();
   const qc = useQueryClient();
 
   const [done, setDone] = useState(false);
@@ -214,6 +216,14 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
   const [selectedProductId, setSelectedProductId] = useState('');
   const [itemQty, setItemQty] = useState('1');
   const [itemUnitPrice, setItemUnitPrice] = useState('');
+
+  // Add Customer Modal State
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
+  const [newCustomerCity, setNewCustomerCity] = useState('');
+  const [newCustomerBalance, setNewCustomerBalance] = useState('');
+  const [customerModalError, setCustomerModalError] = useState<string | null>(null);
 
   const handleProductSelect = (productId: string) => {
     setSelectedProductId(productId);
@@ -234,6 +244,44 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
 
   const paid = Number(paidAmount) || 0;
   const due = Math.max(totalAmount - paid, 0);
+
+  const handleCreateCustomer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustomerName.trim()) return;
+
+    setCustomerModalError(null);
+
+    const payload = {
+      name: newCustomerName.trim(),
+      phone: newCustomerPhone.trim() || null,
+      city: newCustomerCity.trim() || null,
+      openingBalance: Number(newCustomerBalance) || 0,
+      opening_balance: Number(newCustomerBalance) || 0,
+    };
+
+    createBuyer.mutate(
+      { data: payload as any },
+      {
+        onSuccess: (data: any) => {
+          qc.invalidateQueries({ queryKey: getGetBuyersQueryKey() });
+          setIsCustomerModalOpen(false);
+          setNewCustomerName('');
+          setNewCustomerPhone('');
+          setNewCustomerCity('');
+          setNewCustomerBalance('');
+
+          // Select newly created customer directly if ID returned
+          if (data && data.id) {
+            setBuyerId(String(data.id));
+          }
+        },
+        onError: (err: any) => {
+          console.error('Supabase Customer Creation Error:', err);
+          setCustomerModalError(err?.message || 'Failed to add customer. Please try again.');
+        },
+      }
+    );
+  };
 
   const addItem = () => {
     if (!selectedProductId) return;
@@ -341,6 +389,12 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     );
   };
 
+  // Restrict recent invoices table display to only last 50 invoices
+  const recentSales = useMemo(() => {
+    if (!sales.data) return [];
+    return sales.data.slice(0, 50);
+  }, [sales.data]);
+
   return (
     <div className="animate-in">
       <PageIntro eyebrow="Fast lane" title="Make a sale" detail="A clean invoice now means a clean drawer later." />
@@ -358,8 +412,17 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           </div>
 
           <form onSubmit={submit} className="grid gap-4">
-            <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
-              Customer
+            <div className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+              <div className="flex items-center justify-between">
+                <span>Customer</span>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomerModalOpen(true)}
+                  className="flex items-center gap-1 text-xs text-primary font-bold hover:underline cursor-pointer"
+                >
+                  <UserPlus size={14} /> + New Customer
+                </button>
+              </div>
               <select
                 data-testid="select-buyer"
                 required
@@ -370,11 +433,11 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                 <option value="">Choose a Customer…</option>
                 {buyers.data?.map((b: any) => (
                   <option key={b.id} value={b.id}>
-                    {b.name} · {b.phone}
+                    {b.name} {b.phone ? `· ${b.phone}` : ''}
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
 
             <div className="rounded-lg border bg-muted/30 p-3">
               <div className="mb-2 text-xs font-semibold text-muted-foreground">Add Products to Sale</div>
@@ -514,9 +577,6 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               <h3 className="font-bold">Recent invoices</h3>
               <p className="mt-1 text-xs text-muted-foreground">Click any invoice to view full details</p>
             </div>
-            <Button variant="outline" onClick={() => window.print()} testId="button-print-sales">
-              <Printer size={15} /> Print list
-            </Button>
           </div>
 
           <div className="mt-5 overflow-x-auto">
@@ -524,7 +584,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               <Loading />
             ) : sales.isError ? (
               <Failed onRetry={() => sales.refetch()} />
-            ) : sales.data?.length ? (
+            ) : recentSales.length ? (
               <table className="w-full min-w-[550px] text-left text-sm">
                 <thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
                   <tr>
@@ -536,7 +596,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/70">
-                  {sales.data.map((s: any) => {
+                  {recentSales.map((s: any) => {
                     const invNo = s.invoice_number || s.invoiceNumber || s.id;
                     const cleanNum = String(invNo).replace(/^INV-?/i, '');
                     const tot = s.total_amount ?? s.totalAmount ?? 0;
@@ -593,6 +653,71 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           </div>
         </section>
       </div>
+
+      {/* Add New Customer Modal */}
+      {isCustomerModalOpen && (
+        <Modal
+          title="Add New Customer"
+          eyebrow="Quick Setup"
+          onClose={() => setIsCustomerModalOpen(false)}
+        >
+          <form onSubmit={handleCreateCustomer} className="grid gap-4 pt-2">
+            <Field
+              label="Customer / Shop Name"
+              name="new-customer-name"
+              value={newCustomerName}
+              onChange={setNewCustomerName}
+              required
+              placeholder="e.g. Madina General Store"
+            />
+
+            <Field
+              label="Phone Number"
+              name="new-customer-phone"
+              value={newCustomerPhone}
+              onChange={setNewCustomerPhone}
+              placeholder="0300-1234567"
+            />
+
+            <Field
+              label="City / Address"
+              name="new-customer-city"
+              value={newCustomerCity}
+              onChange={setNewCustomerCity}
+              placeholder="e.g. Lahore"
+            />
+
+            <Field
+              label="Opening Balance (Khata Udhar)"
+              name="new-customer-balance"
+              type="number"
+              value={newCustomerBalance}
+              onChange={setNewCustomerBalance}
+              placeholder="0"
+            />
+
+            {customerModalError && (
+              <div className="flex items-center gap-2 rounded bg-destructive/10 p-2.5 text-xs font-semibold text-destructive">
+                <AlertCircle size={15} />
+                <span>{customerModalError}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-3 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCustomerModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createBuyer.isPending}>
+                {createBuyer.isPending ? 'Saving…' : 'Save Customer'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       {selectedInvoice && (
         <InvoiceDetailModal 
