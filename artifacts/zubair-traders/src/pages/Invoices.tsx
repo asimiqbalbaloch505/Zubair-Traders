@@ -40,6 +40,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
       const buyerName = p.buyers?.name || 'Walk-in Buyer';
       const recNo = p.id ? `REC-${p.id}` : 'REC-PAYMENT';
       const amount = Number(p.amount || 0);
+      const recordDate = p.created_at || p.transaction_time || p.transactionTime || p.date;
 
       return {
         ...p,
@@ -48,8 +49,8 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
         invoice_number: recNo,
         buyerName: buyerName,
         buyer_name: buyerName,
-        created_at: p.created_at,
-        transactionTime: p.created_at,
+        created_at: recordDate,
+        transactionTime: recordDate,
         totalAmount: amount,
         total_amount: amount,
         paidAmount: amount,
@@ -69,6 +70,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
     const purchaseList = (purchases.data || []).map((pur: any) => {
       const supplierName = pur.supplierName || pur.suppliers?.name || pur.supplier_name || 'Walk-in / Cash Purchase';
       const purNo = pur.id ? `PUR-${pur.id}` : 'PUR-INV';
+      const recordDate = pur.created_at || pur.transaction_time || pur.transactionTime || pur.date;
 
       return {
         ...pur,
@@ -77,8 +79,8 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
         invoice_number: purNo,
         buyerName: supplierName,
         buyer_name: supplierName,
-        created_at: pur.created_at || pur.transaction_time || pur.transactionTime,
-        transactionTime: pur.created_at || pur.transaction_time || pur.transactionTime,
+        created_at: recordDate,
+        transactionTime: recordDate,
         totalAmount: Number(pur.totalAmount ?? pur.total_amount ?? 0),
         total_amount: Number(pur.totalAmount ?? pur.total_amount ?? 0),
         paidAmount: Number(pur.paidAmount ?? pur.paid_amount ?? 0),
@@ -94,8 +96,8 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
     });
 
     return [...salesList, ...udhaarList, ...purchaseList].sort((a, b) => {
-      const dateA = new Date(a.created_at || a.transactionTime || 0).getTime();
-      const dateB = new Date(b.created_at || b.transactionTime || 0).getTime();
+      const dateA = new Date(a.created_at || a.transactionTime || a.transaction_time || a.date || 0).getTime();
+      const dateB = new Date(b.created_at || b.transactionTime || b.transaction_time || b.date || 0).getTime();
       return dateB - dateA;
     });
   }, [sales.data, buyerPayments.data, purchases.data]);
@@ -112,7 +114,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
       }
 
       if (dateFilter) {
-        const rawDate = inv.created_at || inv.transactionTime;
+        const rawDate = inv.created_at || inv.transactionTime || inv.transaction_time || inv.date;
         if (!rawDate) return false;
         const invDateStr = new Date(rawDate).toISOString().split('T')[0];
         if (invDateStr !== dateFilter) return false;
@@ -139,7 +141,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
     <div className="animate-in space-y-6">
       <PageIntro
         eyebrow="Billing Records"
-        title="Invoices Directory"
+        title="Sales & Purchases Record"
         detail="Search, filter by date, and review all line-itemized business invoices and payment receipts."
       />
 
@@ -228,7 +230,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                   const invNo = inv.invoiceNumber || inv.invoice_number || inv.id;
                   const cleanNum = String(invNo).replace(/^INV-?/i, '');
                   const buyer = inv.buyerName || inv.buyer_name || 'Walk-in Party';
-                  const date = inv.created_at || inv.transactionTime;
+                  const date = inv.created_at || inv.transactionTime || inv.transaction_time || inv.date;
                   const total = inv.totalAmount ?? inv.total_amount ?? 0;
                   const status = String(inv.paymentStatus || inv.payment_status || 'unpaid').toLowerCase();
 
@@ -319,7 +321,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
               </div>
               <div>
                 <span className="font-semibold text-foreground">Date:</span>{' '}
-                {timeDate(selectedInvoice.created_at || selectedInvoice.transactionTime)}
+                {timeDate(selectedInvoice.created_at || selectedInvoice.transactionTime || selectedInvoice.transaction_time || selectedInvoice.date)}
               </div>
             </div>
 

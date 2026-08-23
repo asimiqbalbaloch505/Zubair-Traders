@@ -295,7 +295,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
 
           <form onSubmit={submit} className="grid gap-4">
             <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
-              Buyer
+              Customer
               <select
                 data-testid="select-buyer"
                 required
@@ -303,7 +303,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                 onChange={e => setBuyerId(e.target.value)}
                 className="h-10 rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary"
               >
-                <option value="">Choose a buyer…</option>
+                <option value="">Choose a Customer…</option>
                 {buyers.data?.map((b: any) => (
                   <option key={b.id} value={b.id}>
                     {b.name} · {b.phone}
@@ -415,7 +415,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
 
             <div className="rounded-lg bg-muted p-3">
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Due on this invoice</span>
+                <span>Udhar on this invoice</span>
                 <span className="font-mono font-bold text-foreground">{money(due)}</span>
               </div>
             </div>
