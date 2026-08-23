@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Plus, Check, X, Printer, FileText, ShoppingCart, AlertCircle
+  Plus, Check, X, Printer, FileText, ShoppingCart, AlertCircle, Building2
 } from 'lucide-react';
 import { 
   useGetSales, getGetSalesQueryKey, 
@@ -60,63 +60,84 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
   };
 
   return (
-    <Modal title={`Invoice #${cleanInvoiceNo}`} eyebrow="Sales Receipt Detail" onClose={onClose}>
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden !important;
-          }
-          .printable-invoice-container, .printable-invoice-container * {
-            visibility: visible !important;
-          }
-          .printable-invoice-container {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            padding: 20px !important;
-            margin: 0 !important;
-            box-shadow: none !important;
-            background: #fff !important;
-          }
-          .print-hide {
-            display: none !important;
-          }
-        }
-      `}</style>
-      <div className="space-y-4 text-sm printable-invoice-container">
-        <div className="flex justify-between border-b pb-3 text-xs text-muted-foreground">
+    <Modal title={`Invoice #${cleanInvoiceNo}`} eyebrow="Official Sales Invoice" onClose={onClose}>
+      {/* Printable Invoice Container */}
+      <div className="printable-invoice relative p-6 bg-white text-black rounded-lg border border-border overflow-hidden">
+        
+        {/* Zubair Traders Background Watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.04]">
+          <span className="text-7xl font-extrabold uppercase tracking-widest text-black -rotate-12">
+            ZUBAIR TRADERS
+          </span>
+        </div>
+
+        {/* Professional Header */}
+        <div className="relative flex justify-between items-start border-b border-black/20 pb-4 mb-4">
           <div>
-            <span className="font-semibold text-foreground">Buyer:</span> {sale.buyerName || sale.buyer_name || 'Walk-in Buyer'}
+            <div className="flex items-center gap-2">
+              <Building2 size={24} className="text-black" />
+              <h1 className="text-xl font-bold uppercase tracking-wider text-black">
+                Zubair Traders
+              </h1>
+            </div>
+            <p className="text-xs text-gray-600 mt-1 font-medium">
+              Bakery & General Traders Management
+            </p>
           </div>
-          <div>
-            <span className="font-semibold text-foreground">Date & Time:</span> {formattedDate}
+          <div className="text-right">
+            <span className="inline-block px-3 py-1 bg-black text-white text-xs font-bold uppercase rounded">
+              Tax Invoice
+            </span>
+            <p className="text-xs text-gray-600 font-mono mt-1">
+              Inv #: {cleanInvoiceNo}
+            </p>
           </div>
         </div>
 
+        {/* Customer & Date Info */}
+        <div className="relative grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded border border-gray-200 text-xs mb-4">
+          <div>
+            <p className="text-gray-500 uppercase text-[10px] font-bold">
+              Customer Name
+            </p>
+            <p className="font-bold text-black text-sm">
+              {sale.buyerName || sale.buyer_name || 'Walk-in Customer'}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-gray-500 uppercase text-[10px] font-bold">Transaction Date</p>
+            <p className="font-semibold text-black">
+              {formattedDate}
+            </p>
+          </div>
+        </div>
+
+        {/* Line Items Table */}
         {sale.items && sale.items.length > 0 ? (
-          <div className="max-h-56 overflow-y-auto border-y py-2 print:max-h-none print:overflow-visible">
+          <div className="border border-gray-200 rounded overflow-hidden mb-4">
             <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b text-muted-foreground">
-                  <th className="pb-1">Item</th>
-                  <th className="pb-1 text-center">Qty</th>
-                  <th className="pb-1 text-right">Unit Price</th>
-                  <th className="pb-1 text-right">Total</th>
+              <thead className="bg-gray-100 border-b border-gray-200 text-black font-bold uppercase text-[10px]">
+                <tr>
+                  <th className="p-2">Item Description</th>
+                  <th className="p-2 text-center">Qty</th>
+                  <th className="p-2 text-right">Unit Price</th>
+                  <th className="p-2 text-right">Total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-gray-200">
                 {sale.items.map((item: any, idx: number) => {
                   const qty = Number(item.quantity ?? item.qty ?? 1);
                   const uPrice = Number(item.unitPrice ?? item.unit_price ?? item.price ?? 0);
                   const tPrice = Number(item.totalPrice ?? item.total_price ?? (qty * uPrice));
 
                   return (
-                    <tr key={idx}>
-                      <td className="py-1.5 font-medium">{item.productName || item.product_name || 'Product'}</td>
-                      <td className="py-1.5 text-center">{qty}</td>
-                      <td className="py-1.5 text-right">{money(uPrice)}</td>
-                      <td className="py-1.5 text-right font-mono">{money(tPrice)}</td>
+                    <tr key={idx} className="print-keep-together">
+                      <td className="p-2 font-medium text-black">
+                        {item.productName || item.product_name || 'Product'}
+                      </td>
+                      <td className="p-2 text-center">{qty}</td>
+                      <td className="p-2 text-right">{money(uPrice)}</td>
+                      <td className="p-2 text-right font-mono font-bold">{money(tPrice)}</td>
                     </tr>
                   );
                 })}
@@ -124,35 +145,45 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
             </table>
           </div>
         ) : (
-          <div className="rounded bg-muted p-3 text-center text-xs text-muted-foreground">
+          <div className="rounded border bg-gray-50 p-3 text-center text-xs text-gray-500 mb-4">
             No itemized products linked to this invoice.
           </div>
         )}
 
-        <div className="space-y-1.5 rounded-lg bg-muted/60 p-3 text-xs">
-          <div className="flex justify-between">
-            <span>Total Amount:</span>
-            <span className="font-mono font-bold">{money(total)}</span>
-          </div>
-          <div className="flex justify-between text-emerald-700">
-            <span>Paid Amount:</span>
-            <span className="font-mono font-bold">{money(paid)}</span>
-          </div>
-          <div className="flex justify-between text-destructive">
-            <span>Balance Due:</span>
-            <span className="font-mono font-bold">{money(due)}</span>
+        {/* Total Summary */}
+        <div className="relative flex justify-end mb-6">
+          <div className="w-64 space-y-1.5 bg-gray-50 border border-gray-200 p-3 rounded text-xs">
+            <div className="flex justify-between text-gray-700">
+              <span>Total Amount:</span>
+              <span className="font-mono font-bold text-black">{money(total)}</span>
+            </div>
+            <div className="flex justify-between text-emerald-800">
+              <span>Paid Amount:</span>
+              <span className="font-mono font-bold">{money(paid)}</span>
+            </div>
+            <div className="flex justify-between text-red-700 border-t border-gray-300 pt-1 font-bold">
+              <span>Balance Due:</span>
+              <span className="font-mono">{money(due)}</span>
+            </div>
           </div>
         </div>
 
         {sale.notes && (
-          <div className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Notes:</strong> {sale.notes}
+          <div className="text-xs text-gray-600 mb-4">
+            <strong className="text-black">Notes:</strong> {sale.notes}
           </div>
         )}
 
-        <div className="flex justify-end gap-2 pt-2 print-hide">
+        {/* Invoice Footer Stamp */}
+        <div className="relative text-center border-t border-gray-200 pt-3">
+          <p className="text-xs font-bold text-black">Thank you for your business!</p>
+          <p className="text-[10px] text-gray-500 mt-0.5">Zubair Traders • Authorized Computer Generated Receipt</p>
+        </div>
+
+        {/* Non-Printable Action Buttons */}
+        <div className="flex justify-end gap-2 pt-4 print:hidden border-t mt-4">
           <Button variant="outline" testId="button-modal-print" onClick={handlePrint}>
-            <Printer size={15} /> Print
+            <Printer size={15} /> Print / Save PDF
           </Button>
           <Button testId="button-modal-close" onClick={onClose}>
             Close
@@ -322,7 +353,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
             </div>
             <div>
               <h3 className="font-bold">New Sale</h3>
-              <p className="text-xs text-muted-foreground">Select buyer and add line items</p>
+              <p className="text-xs text-muted-foreground">Select customer and add line items</p>
             </div>
           </div>
 
@@ -498,7 +529,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                 <thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
                   <tr>
                     <th className="pb-3">Invoice #</th>
-                    <th className="pb-3">Buyer & Time</th>
+                    <th className="pb-3">Customer & Time</th>
                     <th className="pb-3">Total</th>
                     <th className="pb-3">Status</th>
                     <th className="pb-3 text-right">Actions</th>
@@ -521,7 +552,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                       >
                         <td className="py-3 font-mono text-xs font-bold">{cleanNum}</td>
                         <td className="py-3 font-semibold">
-                          {s.buyerName || s.buyer_name || 'Walk-in Buyer'}
+                          {s.buyerName || s.buyer_name || 'Walk-in Customer'}
                           <div className="text-[10px] text-muted-foreground">
                             {timeDate(s.created_at || s.transactionTime)}
                           </div>
