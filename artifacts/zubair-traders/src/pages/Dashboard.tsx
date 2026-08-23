@@ -81,7 +81,7 @@ export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money, onNa
 
         <section className="panel rounded-xl p-5">
           <div className="flex items-start justify-between">
-            <div><h3 className="font-bold">Low stock watch</h3><p className="mt-1 text-xs text-muted-foreground">Restock before running out</p></div>
+            <div><h3 className="font-bold">Low stock Alert </h3><p className="mt-1 text-xs text-muted-foreground">Restock before running out</p></div>
             <button 
               type="button" 
               onClick={() => onNavigate?.('products')} 

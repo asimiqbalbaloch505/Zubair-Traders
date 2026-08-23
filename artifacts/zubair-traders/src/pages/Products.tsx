@@ -293,7 +293,7 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
                 onChange={(v: string) => setProductForm({ ...productForm, unit: v })} 
               />
               <Field 
-                label="Opening stock" 
+                label="Stock in " 
                 name="product-stock" 
                 type="number" 
                 value={productForm.stockQuantity} 
