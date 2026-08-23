@@ -222,8 +222,12 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [newCustomerCity, setNewCustomerCity] = useState('');
-  const [newCustomerBalance, setNewCustomerBalance] = useState('');
   const [customerModalError, setCustomerModalError] = useState<string | null>(null);
+
+  const openCustomerModal = () => {
+    setIsCustomerModalOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const handleProductSelect = (productId: string) => {
     setSelectedProductId(productId);
@@ -255,8 +259,6 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
       name: newCustomerName.trim(),
       phone: newCustomerPhone.trim() || null,
       city: newCustomerCity.trim() || null,
-      openingBalance: Number(newCustomerBalance) || 0,
-      opening_balance: Number(newCustomerBalance) || 0,
     };
 
     createBuyer.mutate(
@@ -268,7 +270,6 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           setNewCustomerName('');
           setNewCustomerPhone('');
           setNewCustomerCity('');
-          setNewCustomerBalance('');
 
           // Select newly created customer directly if ID returned
           if (data && data.id) {
@@ -417,7 +418,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                 <span>Customer</span>
                 <button
                   type="button"
-                  onClick={() => setIsCustomerModalOpen(true)}
+                  onClick={openCustomerModal}
                   className="flex items-center gap-1 text-xs text-primary font-bold hover:underline cursor-pointer"
                 >
                   <UserPlus size={14} /> + New Customer
@@ -685,15 +686,6 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               value={newCustomerCity}
               onChange={setNewCustomerCity}
               placeholder="e.g. Lahore"
-            />
-
-            <Field
-              label="Opening Balance (Khata Udhar)"
-              name="new-customer-balance"
-              type="number"
-              value={newCustomerBalance}
-              onChange={setNewCustomerBalance}
-              placeholder="0"
             />
 
             {customerModalError && (

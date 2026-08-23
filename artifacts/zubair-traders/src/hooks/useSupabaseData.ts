@@ -192,7 +192,8 @@ export function useGetBuyers(_options?: any) {
         phone: b.phone,
         cnic: b.cnic,
         address: b.address,
-        creditLimit: b.credit_limit ?? b.creditLimit,
+        creditLimit: b.credit_limit ?? b.creditLimit ?? 0,
+        credit_limit: b.credit_limit ?? b.creditLimit ?? 0,
         currentBalance: b.current_balance ?? b.currentBalance ?? 0,
       }));
     },
@@ -208,7 +209,7 @@ export function useCreateBuyer() {
         phone: data.phone,
         cnic: data.cnic,
         address: data.address,
-        credit_limit: data.creditLimit,
+        credit_limit: data.creditLimit ?? data.credit_limit ?? 0,
         current_balance: 0,
       }]).select();
       if (error) throw error;
@@ -227,7 +228,7 @@ export function useUpdateBuyer() {
         phone: data.phone,
         cnic: data.cnic,
         address: data.address,
-        credit_limit: data.creditLimit,
+        credit_limit: data.creditLimit ?? data.credit_limit ?? 0,
       }).eq('id', id).select();
       if (error) throw error;
       return res;
