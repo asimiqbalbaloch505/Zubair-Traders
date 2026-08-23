@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { FileText, Printer, Search, Filter, Calendar, X } from 'lucide-react';
+import { FileText, Printer, Search, Filter, Calendar, X, Building2 } from 'lucide-react';
 import { useGetSales, useGetBuyerPayments, useGetPurchases } from '../hooks/useSupabaseData';
 
 interface InvoicesProps {
@@ -27,7 +27,6 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
   const isLoading = sales.isLoading || buyerPayments.isLoading || purchases.isLoading;
   const isError = sales.isError || buyerPayments.isError || purchases.isError;
 
-  // Combine Sales, Udhaar Buyer Payments, and Purchase Invoices into a single dataset
   const combinedRecords = useMemo(() => {
     const salesList = (sales.data || []).map((s: any) => ({
       ...s,
@@ -37,7 +36,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
     }));
 
     const udhaarList = (buyerPayments.data || []).map((p: any) => {
-      const buyerName = p.buyers?.name || 'Walk-in Buyer';
+      const customerName = p.buyers?.name || 'Walk-in Customer';
       const recNo = p.id ? `REC-${p.id}` : 'REC-PAYMENT';
       const amount = Number(p.amount || 0);
       const recordDate = p.created_at || p.transaction_time || p.transactionTime || p.date;
@@ -47,8 +46,8 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
         uniqueKey: `udhaar-${p.id}`,
         invoiceNumber: recNo,
         invoice_number: recNo,
-        buyerName: buyerName,
-        buyer_name: buyerName,
+        buyerName: customerName,
+        buyer_name: customerName,
         created_at: recordDate,
         transactionTime: recordDate,
         totalAmount: amount,
@@ -151,7 +150,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search by invoice # or client/supplier..."
+              placeholder="Search by invoice # or customer/supplier..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none focus:border-primary"
@@ -199,10 +198,10 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
               onChange={(e: any) => setStatusFilter(e.target.value)}
               className="h-10 rounded-lg border border-input bg-background px-3 text-xs font-semibold outline-none focus:border-primary"
             >
-              <option value="all">All </option>
+              <option value="all">All Statuses</option>
               <option value="paid">Paid</option>
-              <option value="partial">half paid</option>
-              <option value="unpaid">Udhar</option>
+              <option value="partial">Half Paid</option>
+              <option value="unpaid">Udhaar / Unpaid</option>
             </select>
           </div>
         </div>
@@ -218,7 +217,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                 <tr>
                   <th className="pb-3">Invoice / Rec #</th>
                   <th className="pb-3">Type</th>
-                  <th className="pb-3">Client / Supplier</th>
+                  <th className="pb-3">Customer / Supplier</th>
                   <th className="pb-3">Date</th>
                   <th className="pb-3">Total</th>
                   <th className="pb-3">Status</th>
@@ -229,7 +228,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                 {filteredInvoices.map((inv: any) => {
                   const invNo = inv.invoiceNumber || inv.invoice_number || inv.id;
                   const cleanNum = String(invNo).replace(/^INV-?/i, '');
-                  const buyer = inv.buyerName || inv.buyer_name || 'Walk-in Party';
+                  const customer = inv.buyerName || inv.buyer_name || 'Walk-in Customer';
                   const date = inv.created_at || inv.transactionTime || inv.transaction_time || inv.date;
                   const total = inv.totalAmount ?? inv.total_amount ?? 0;
                   const status = String(inv.paymentStatus || inv.payment_status || 'unpaid').toLowerCase();
@@ -257,7 +256,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                         </span>
                       </td>
                       <td className="py-3 font-semibold text-foreground">
-                        {buyer}
+                        {customer}
                       </td>
                       <td className="py-3 text-xs text-muted-foreground">
                         {timeDate(date)}
@@ -307,62 +306,100 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
               ? 'Udhaar Payment Receipt'
               : selectedInvoice.recordType === 'purchase'
               ? 'Supplier Restock Invoice'
-              : 'Invoice Itemized Statement'
+              : 'Official Sales Invoice'
           }
           onClose={() => setSelectedInvoice(null)}
         >
-          <div className="space-y-4 text-sm printable-invoice">
-            <div className="flex justify-between border-b pb-3 text-xs text-muted-foreground">
+          {/* Printable Invoice Container */}
+          <div className="printable-invoice relative p-6 bg-white text-black rounded-lg border border-border overflow-hidden">
+            
+            {/* Zubair Traders Background Watermark */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.04]">
+              <span className="text-7xl font-extrabold uppercase tracking-widest text-black -rotate-12">
+                ZUBAIR TRADERS
+              </span>
+            </div>
+
+            {/* Professional Header */}
+            <div className="relative flex justify-between items-start border-b border-black/20 pb-4 mb-4">
               <div>
-                <span className="font-semibold text-foreground">
-                  {selectedInvoice.recordType === 'purchase' ? 'Supplier:' : 'Client:'}
-                </span>{' '}
-                {selectedInvoice.buyerName || selectedInvoice.buyer_name || 'Walk-in Party'}
+                <div className="flex items-center gap-2">
+                  <Building2 size={24} className="text-black" />
+                  <h1 className="text-xl font-bold uppercase tracking-wider text-black">
+                    Zubair Traders
+                  </h1>
+                </div>
+                <p className="text-xs text-gray-600 mt-1 font-medium">
+                  Bakery & General Traders Management
+                </p>
               </div>
-              <div>
-                <span className="font-semibold text-foreground">Date:</span>{' '}
-                {timeDate(selectedInvoice.created_at || selectedInvoice.transactionTime || selectedInvoice.transaction_time || selectedInvoice.date)}
+              <div className="text-right">
+                <span className="inline-block px-3 py-1 bg-black text-white text-xs font-bold uppercase rounded">
+                  {selectedInvoice.recordType === 'purchase' ? 'Purchase Invoice' : 'Tax Invoice'}
+                </span>
+                <p className="text-xs text-gray-600 font-mono mt-1">
+                  Inv #: {String(selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.id).replace(/^INV-?/i, '')}
+                </p>
               </div>
             </div>
 
+            {/* Customer & Date Info */}
+            <div className="relative grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded border border-gray-200 text-xs mb-4">
+              <div>
+                <p className="text-gray-500 uppercase text-[10px] font-bold">
+                  {selectedInvoice.recordType === 'purchase' ? 'Supplier Name' : 'Customer Name'}
+                </p>
+                <p className="font-bold text-black text-sm">
+                  {selectedInvoice.buyerName || selectedInvoice.buyer_name || 'Walk-in Customer'}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-gray-500 uppercase text-[10px] font-bold">Transaction Date</p>
+                <p className="font-semibold text-black">
+                  {timeDate(selectedInvoice.created_at || selectedInvoice.transactionTime || selectedInvoice.transaction_time || selectedInvoice.date)}
+                </p>
+              </div>
+            </div>
+
+            {/* Line Items Table */}
             {selectedInvoice.recordType === 'udhaar' ? (
-              <div className="rounded-lg bg-emerald-50/60 p-4 border border-emerald-200/50 space-y-2">
-                <div className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">
+              <div className="rounded-lg bg-emerald-50/60 p-4 border border-emerald-200 space-y-2 mb-4">
+                <div className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
                   Udhaar Repayment Detail
                 </div>
-                <div className="text-sm text-foreground">
+                <div className="text-xs text-black">
                   <strong>Notes / Reference:</strong> {selectedInvoice.notes || 'Udhaar Payment Collected'}
                 </div>
                 {selectedInvoice.paymentMethod && (
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-gray-600">
                     <strong>Payment Method:</strong> {selectedInvoice.paymentMethod}
                   </div>
                 )}
               </div>
             ) : selectedInvoice.items && selectedInvoice.items.length > 0 ? (
-              <div className="max-h-56 overflow-y-auto border-y py-2">
+              <div className="border border-gray-200 rounded overflow-hidden mb-4">
                 <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b text-muted-foreground">
-                      <th className="pb-1">Item Description</th>
-                      <th className="pb-1 text-center">Qty</th>
-                      <th className="pb-1 text-right">
-                        {selectedInvoice.recordType === 'purchase' ? 'Purchase Cost' : 'Unit Price'}
+                  <thead className="bg-gray-100 border-b border-gray-200 text-black font-bold uppercase text-[10px]">
+                    <tr>
+                      <th className="p-2">Item Description</th>
+                      <th className="p-2 text-center">Qty</th>
+                      <th className="p-2 text-right">
+                        {selectedInvoice.recordType === 'purchase' ? 'Cost' : 'Unit Price'}
                       </th>
-                      <th className="pb-1 text-right">Subtotal</th>
+                      <th className="p-2 text-right">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-gray-200">
                     {selectedInvoice.items.map((item: any, idx: number) => (
-                      <tr key={idx}>
-                        <td className="py-1.5 font-medium">
+                      <tr key={idx} className="print-keep-together">
+                        <td className="p-2 font-medium text-black">
                           {item.productName || item.product_name || item.name || item.products?.name || `Product #${item.product_id}`}
                         </td>
-                        <td className="py-1.5 text-center">{item.quantity || item.qty || 0}</td>
-                        <td className="py-1.5 text-right">
+                        <td className="p-2 text-center">{item.quantity || item.qty || 0}</td>
+                        <td className="p-2 text-right">
                           {money(item.purchase_cost ?? item.unitCost ?? item.unitPrice ?? item.unit_price ?? 0)}
                         </td>
-                        <td className="py-1.5 text-right font-mono">
+                        <td className="p-2 text-right font-mono font-bold">
                           {money(item.subtotal ?? item.totalPrice ?? item.total_price ?? ((item.quantity || 0) * (item.purchase_cost || item.unitCost || 0)))}
                         </td>
                       </tr>
@@ -371,35 +408,45 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                 </table>
               </div>
             ) : (
-              <div className="rounded bg-muted p-3 text-center text-xs text-muted-foreground">
-                No itemized product lines attached to this invoice record.
+              <div className="rounded border bg-gray-50 p-3 text-center text-xs text-gray-500 mb-4">
+                No itemized product lines attached to this invoice.
               </div>
             )}
 
-            <div className="space-y-1.5 rounded-lg bg-muted/60 p-3 text-xs">
-              <div className="flex justify-between">
-                <span>Total Amount:</span>
-                <span className="font-mono font-bold">
-                  {money(selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0)}
-                </span>
-              </div>
-              <div className="flex justify-between text-emerald-700">
-                <span>Paid Amount:</span>
-                <span className="font-mono font-bold">
-                  {money(selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0)}
-                </span>
-              </div>
-              <div className="flex justify-between text-destructive">
-                <span>Balance Due:</span>
-                <span className="font-mono font-bold">
-                  {money(selectedInvoice.dueAmount ?? selectedInvoice.due_amount ?? 0)}
-                </span>
+            {/* Total Summary */}
+            <div className="relative flex justify-end mb-6">
+              <div className="w-64 space-y-1.5 bg-gray-50 border border-gray-200 p-3 rounded text-xs">
+                <div className="flex justify-between text-gray-700">
+                  <span>Total Amount:</span>
+                  <span className="font-mono font-bold text-black">
+                    {money(selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-emerald-800">
+                  <span>Paid Amount:</span>
+                  <span className="font-mono font-bold">
+                    {money(selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-red-700 border-t border-gray-300 pt-1 font-bold">
+                  <span>Balance Due:</span>
+                  <span className="font-mono">
+                    {money(selectedInvoice.dueAmount ?? selectedInvoice.due_amount ?? 0)}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 print:hidden">
+            {/* Invoice Footer Stamp */}
+            <div className="relative text-center border-t border-gray-200 pt-3">
+              <p className="text-xs font-bold text-black">Thank you for your business!</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Zubair Traders • Authorized Computer Generated Receipt</p>
+            </div>
+
+            {/* Non-Printable Action Buttons */}
+            <div className="flex justify-end gap-2 pt-4 print:hidden border-t mt-4">
               <Button variant="outline" onClick={() => window.print()}>
-                <Printer size={15} /> Print
+                <Printer size={15} /> Print / Save PDF
               </Button>
               <Button onClick={() => setSelectedInvoice(null)}>Close</Button>
             </div>

@@ -52,9 +52,14 @@
 
 @keyframes rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 
-/* --- INVOICE PRINTING STYLES --- */
+/* --- INVOICE PRINT & PDF STYLES --- */
+@page {
+  margin: 0 !important; /* Removes header URL, page numbers, and dates */
+  size: A4 portrait;
+}
+
 @media print {
-  nav, sidebar, header, footer, button, .no-print {
+  nav, sidebar, header, footer, button, .print\:hidden {
     display: none !important;
   }
 
@@ -65,8 +70,8 @@
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
+    height: 100% !important;
+    overflow: hidden !important;
   }
 
   .printable-invoice {
@@ -74,12 +79,16 @@
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
+    height: 100% !important;
+    max-height: 100vh !important;
     margin: 0 !important;
-    padding: 24px !important;
+    padding: 1.5rem !important;
     box-shadow: none !important;
     border: none !important;
     background: #ffffff !important;
     color: #000000 !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 
   tr, .print-keep-together {
