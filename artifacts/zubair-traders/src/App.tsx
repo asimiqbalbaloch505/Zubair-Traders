@@ -174,9 +174,9 @@ function MainApp() {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'sales', label: 'Sales', icon: ShoppingCart },
-    { id: 'invoices', label: 'Invoices', icon: FileText },
+    { id: 'invoices', label: 'Records', icon: FileText },
     { id: 'buyers', label: 'Customers', icon: Users },
-    { id: 'ledger', label: 'Ledger', icon: BookOpen },
+    { id: 'ledger', label: 'Khata', icon: BookOpen },
     { id: 'products', label: 'Stock', icon: Package },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
     { id: 'expenses', label: 'Expenses', icon: Wallet },

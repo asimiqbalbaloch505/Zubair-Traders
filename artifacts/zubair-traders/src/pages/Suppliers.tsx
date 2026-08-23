@@ -176,7 +176,7 @@ export function Suppliers({ PageIntro, Stat, Button, Field, Modal, Loading, Fail
       {modal && (
         <Modal title={editing ? 'Edit supplier' : 'Add supplier'} eyebrow="Supplier directory" onClose={() => setModal(false)}>
           <form onSubmit={submit} className="grid gap-3">
-            <Field label="Contact name" name="supplier-name" value={form.name} onChange={(v: string) => setForm({ ...form, name: v })} required />
+            <Field label="Supplier Name" name="supplier-name" value={form.name} onChange={(v: string) => setForm({ ...form, name: v })} required />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Phone" name="supplier-phone" value={form.phone} onChange={(v: string) => setForm({ ...form, phone: v })} required />
               <Field label="Company" name="supplier-company" value={form.company} onChange={(v: string) => setForm({ ...form, company: v })} />

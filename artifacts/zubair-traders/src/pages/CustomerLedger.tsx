@@ -253,7 +253,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     <div className="animate-in space-y-6">
       <PageIntro
         eyebrow="Financial Records"
-        title="Customer Ledger"
+        title="Customers Khata"
         detail="View customer credit balances, collections history, and itemized invoice details."
       />
 

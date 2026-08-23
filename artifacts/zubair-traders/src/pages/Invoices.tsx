@@ -199,10 +199,10 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
               onChange={(e: any) => setStatusFilter(e.target.value)}
               className="h-10 rounded-lg border border-input bg-background px-3 text-xs font-semibold outline-none focus:border-primary"
             >
-              <option value="all">All Statuses</option>
+              <option value="all">All </option>
               <option value="paid">Paid</option>
-              <option value="partial">Partial</option>
-              <option value="unpaid">Unpaid</option>
+              <option value="partial">half paid</option>
+              <option value="unpaid">Udhar</option>
             </select>
           </div>
         </div>

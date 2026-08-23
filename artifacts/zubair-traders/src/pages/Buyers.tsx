@@ -212,7 +212,7 @@ export function Buyers({
       <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Stat ? (
           <Stat 
-            label="BUYER RECEIVABLES" 
+            label="Total Customer Udhaar" 
             value={money(totalReceivables)} 
             note="Total outstanding customer balance" 
             icon={CreditCard} 
@@ -282,7 +282,7 @@ export function Buyers({
                             className="inline-flex items-center gap-1 rounded-md bg-muted px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/80"
                             title="View Customer Ledger"
                           >
-                            <FileText size={14} /> Ledger
+                            <FileText size={14} /> Khata
                           </button>
                           {balance > 0 && (
                             <button
