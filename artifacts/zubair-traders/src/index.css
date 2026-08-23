@@ -41,16 +41,45 @@
 
 .dark { --background: 171 25% 10%; --foreground: 40 38% 96%; --border: 173 18% 24%; --card: 173 24% 14%; --card-foreground: 40 38% 96%; --card-border: 173 18% 25%; --sidebar: 173 29% 12%; --sidebar-foreground: 40 38% 96%; --sidebar-border: 173 18% 23%; --popover: 173 24% 14%; --popover-foreground: 40 38% 96%; --popover-border: 173 18% 25%; --primary: 39 86% 62%; --primary-foreground: 172 20% 17%; --secondary: 173 24% 22%; --secondary-foreground: 40 38% 96%; --muted: 173 18% 20%; --muted-foreground: 40 16% 70%; --accent: 16 66% 58%; --accent-foreground: 40 38% 99%; --destructive: 3 67% 55%; --destructive-foreground: 40 38% 99%; --input: 173 18% 29%; --ring: 39 86% 62%; }
 
-@layer base { * { @apply border-border; } body { @apply font-sans antialiased bg-background text-foreground; background-image: radial-gradient(rgba(23,54,51,.045) 1px, transparent 1px); background-size: 18px 18px; } }
+@layer base {
+  * { @apply border-border; }
+  html, body {
+    scroll-behavior: auto !important;
+    vertical-align: top;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    background-image: radial-gradient(rgba(23,54,51,.045) 1px, transparent 1px);
+    background-size: 18px 18px;
+    margin: 0;
+    padding: 0;
+  }
+}
 
 @layer utilities {
   .font-mono { font-family: var(--app-font-mono); } .font-display { font-family: var(--app-font-sans); }
   .panel { background: hsl(var(--card)); border: 1px solid hsl(var(--card-border)); box-shadow: var(--shadow-sm); }
   .shine { position: relative; overflow: hidden; } .shine::after { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.08) 50%,transparent 65%); transform:translateX(-100%); transition:transform .7s ease; } .shine:hover::after { transform:translateX(100%); }
-  .animate-in { animation: rise .38s cubic-bezier(.2,.7,.2,1) both; } .stagger-1 { animation-delay:.05s; } .stagger-2 { animation-delay:.1s; } .stagger-3 { animation-delay:.15s; }
+  .animate-in { animation: rise .38s cubic-bezier(.2,.7,.2,1) both; scroll-margin-top: 0px; } 
+  .stagger-1 { animation-delay:.05s; } .stagger-2 { animation-delay:.1s; } .stagger-3 { animation-delay:.15s; }
 }
 
 @keyframes rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+/* Ensure page containers start at absolute top */
+#root, main, [role="main"] {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+/* Force first dynamic panel to attach to top */
+.animate-in > div:first-child,
+.animate-in > section:first-child {
+  order: -1 !important;
+}
 
 /* --- INVOICE PRINT & PDF STYLES --- */
 @page {
