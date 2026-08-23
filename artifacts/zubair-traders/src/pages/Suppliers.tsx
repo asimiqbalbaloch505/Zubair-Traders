@@ -82,7 +82,7 @@ export function Suppliers({ PageIntro, Stat, Button, Field, Modal, Loading, Fail
       <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Stat ? (
           <Stat 
-            label="SUPPLIER PAYABLES" 
+            label="SUPPLIER UDHAAR" 
             value={money(totalPayables)} 
             note="Total balance owed to vendors" 
             icon={Truck} 
