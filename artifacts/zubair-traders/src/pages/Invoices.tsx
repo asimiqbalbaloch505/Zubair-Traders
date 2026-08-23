@@ -390,20 +390,38 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {selectedInvoice.items.map((item: any, idx: number) => (
-                      <tr key={idx} className="print-keep-together">
-                        <td className="p-2 font-medium text-black">
-                          {item.productName || item.product_name || item.name || item.products?.name || `Product #${item.product_id}`}
-                        </td>
-                        <td className="p-2 text-center">{item.quantity || item.qty || 0}</td>
-                        <td className="p-2 text-right">
-                          {money(item.purchase_cost ?? item.unitCost ?? item.unitPrice ?? item.unit_price ?? 0)}
-                        </td>
-                        <td className="p-2 text-right font-mono font-bold">
-                          {money(item.subtotal ?? item.totalPrice ?? item.total_price ?? ((item.quantity || 0) * (item.purchase_cost || item.unitCost || 0)))}
-                        </td>
-                      </tr>
-                    ))}
+                    {selectedInvoice.items.map((item: any, idx: number) => {
+                      const qty = Number(item.quantity || item.qty || 0);
+                      const total = Number(
+                        item.subtotal ??
+                        item.totalPrice ??
+                        item.total_price ??
+                        (qty * Number(item.unit_price || item.unitPrice || item.purchase_cost || item.unitCost || 0))
+                      );
+                      const rawUnitPrice = Number(
+                        item.unit_price ??
+                        item.unitPrice ??
+                        item.purchase_cost ??
+                        item.unitCost ??
+                        0
+                      );
+                      const unitPrice = rawUnitPrice > 0 ? rawUnitPrice : (qty > 0 ? total / qty : 0);
+
+                      return (
+                        <tr key={idx} className="print-keep-together">
+                          <td className="p-2 font-medium text-black">
+                            {item.productName || item.product_name || item.name || item.products?.name || `Product #${item.product_id}`}
+                          </td>
+                          <td className="p-2 text-center">{qty}</td>
+                          <td className="p-2 text-right">
+                            {money(unitPrice)}
+                          </td>
+                          <td className="p-2 text-right font-mono font-bold">
+                            {money(total)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
