@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Plus, Check, X, Printer, FileText, ShoppingCart, AlertCircle, Building2, UserPlus
+  Plus, Check, X, Printer, FileText, ShoppingCart, AlertCircle, Building2, UserPlus, Edit3
 } from 'lucide-react';
 import { 
   useGetSales, getGetSalesQueryKey, 
@@ -21,7 +21,7 @@ export interface SaleItemInput {
 }
 
 export interface SalesInvoice {
-  id: number | string;
+  id?: number | string;
   invoiceNumber?: string | number;
   invoice_number?: string | number;
   buyerId?: number | string;
@@ -50,7 +50,7 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
       })
     : 'N/A';
 
-  const rawInv = sale.invoice_number || sale.invoiceNumber || sale.id;
+  const rawInv = sale.invoice_number || sale.invoiceNumber || sale.id || 'NEW';
   const cleanInvoiceNo = String(rawInv).replace(/^INV-?/i, '');
   const total = sale.total_amount ?? sale.totalAmount ?? 0;
   const paid = sale.paid_amount ?? sale.paidAmount ?? 0;
@@ -62,7 +62,6 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
 
   return (
     <Modal title={`Invoice #${cleanInvoiceNo}`} eyebrow="Official Sales Invoice" onClose={onClose}>
-      {/* Printable Invoice Container */}
       <div className="printable-invoice relative p-6 bg-white text-black rounded-lg border border-border overflow-hidden">
         
         {/* Zubair Traders Background Watermark */}
@@ -217,7 +216,10 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
   const [itemQty, setItemQty] = useState('1');
   const [itemUnitPrice, setItemUnitPrice] = useState('');
 
-  // Add Customer Modal State matching Customer Book Form
+  // Confirmation Modal State
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  // Add Customer Modal State
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
@@ -249,6 +251,10 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
   const paid = Number(paidAmount) || 0;
   const due = Math.max(totalAmount - paid, 0);
 
+  const selectedBuyerObj = useMemo(() => {
+    return buyers.data?.find((b: any) => String(b.id) === String(buyerId));
+  }, [buyers.data, buyerId]);
+
   const handleCreateCustomer = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustomerName.trim()) return;
@@ -273,7 +279,6 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           setNewCustomerCnic('');
           setNewCustomerAddress('');
 
-          // Select newly created customer directly if ID returned
           const created = Array.isArray(data) ? data[0] : data;
           if (created && created.id) {
             setBuyerId(String(created.id));
@@ -348,10 +353,15 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     setItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const submit = (e: React.FormEvent) => {
+  // Pre-submit validation opens confirmation modal
+  const handleOpenConfirmation = (e: React.FormEvent) => {
     e.preventDefault();
     if (!buyerId || items.length === 0) return;
+    setIsConfirming(true);
+  };
 
+  // Actual DB post on confirmation
+  const handleFinalSubmit = () => {
     setErrorMessage(null);
     setDone(false);
 
@@ -379,6 +389,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           qc.invalidateQueries({ queryKey: getGetSalesQueryKey() });
           qc.invalidateQueries({ queryKey: getGetProductsQueryKey() });
           qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+          setIsConfirming(false);
           setDone(true);
           setBuyerId('');
           setItems([]);
@@ -387,13 +398,13 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
         },
         onError: (err: any) => {
           console.error('Supabase Sale Creation Error:', err);
+          setIsConfirming(false);
           setErrorMessage(err?.message || 'Failed to post sale. Please check your data.');
         },
       }
     );
   };
 
-  // Restrict recent invoices table display to only last 50 invoices
   const recentSales = useMemo(() => {
     if (!sales.data) return [];
     return sales.data.slice(0, 50);
@@ -403,7 +414,6 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     <div className="animate-in w-full flex flex-col justify-start pt-0 mt-0">
       <PageIntro eyebrow="Fast lane" title="Make a sale" detail="A clean invoice now means a clean drawer later." />
 
-      {/* Main container explicitly orders the Record Sale panel first */}
       <div className="flex flex-col gap-5">
         <section className="panel rounded-xl p-5">
           <div className="mb-5 flex items-center gap-3">
@@ -416,7 +426,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
             </div>
           </div>
 
-          <form onSubmit={submit} className="grid gap-4">
+          <form onSubmit={handleOpenConfirmation} className="grid gap-4">
             <div className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
               <div className="flex items-center justify-between">
                 <span>Customer</span>
@@ -558,7 +568,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               testId="button-create-sale"
               className="h-11"
             >
-              {create.isPending ? 'Saving invoice…' : <><Check size={17} /> Confirm sale</>}
+              <Check size={17} /> Confirm sale
             </Button>
 
             {done && (
@@ -659,7 +669,123 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
         </section>
       </div>
 
-      {/* Add New Customer Modal (Matches Customer Book form) */}
+      {/* Confirmation & Invoice Preview Modal */}
+      {isConfirming && (
+        <Modal
+          title="Confirm Sale Invoice"
+          eyebrow="Review Details Before Posting"
+          onClose={() => setIsConfirming(false)}
+        >
+          <div className="space-y-4">
+            <div className="printable-invoice relative p-6 bg-white text-black rounded-lg border border-border overflow-hidden">
+              <div className="relative flex justify-between items-start border-b border-black/20 pb-4 mb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Building2 size={24} className="text-black" />
+                    <h1 className="text-xl font-bold uppercase tracking-wider text-black">
+                      Zubair Traders
+                    </h1>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1 font-medium">
+                    Bakery & General Traders Management
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="inline-block px-3 py-1 bg-black text-white text-xs font-bold uppercase rounded">
+                    Draft Invoice
+                  </span>
+                </div>
+              </div>
+
+              <div className="relative grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded border border-gray-200 text-xs mb-4">
+                <div>
+                  <p className="text-gray-500 uppercase text-[10px] font-bold">Customer Name</p>
+                  <p className="font-bold text-black text-sm">
+                    {selectedBuyerObj?.name || 'Walk-in Customer'}
+                  </p>
+                  {selectedBuyerObj?.phone && (
+                    <p className="text-gray-600 text-[11px]">{selectedBuyerObj.phone}</p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-gray-500 uppercase text-[10px] font-bold">Transaction Date</p>
+                  <p className="font-semibold text-black">
+                    {new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="border border-gray-200 rounded overflow-hidden mb-4">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-100 border-b border-gray-200 text-black font-bold uppercase text-[10px]">
+                    <tr>
+                      <th className="p-2">Item Description</th>
+                      <th className="p-2 text-center">Qty</th>
+                      <th className="p-2 text-right">Unit Price</th>
+                      <th className="p-2 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {items.map((item, idx) => (
+                      <tr key={idx}>
+                        <td className="p-2 font-medium text-black">{item.productName}</td>
+                        <td className="p-2 text-center">{item.quantity}</td>
+                        <td className="p-2 text-right">{money(item.unitPrice)}</td>
+                        <td className="p-2 text-right font-mono font-bold">{money(item.totalPrice)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="relative flex justify-end mb-4">
+                <div className="w-64 space-y-1.5 bg-gray-50 border border-gray-200 p-3 rounded text-xs">
+                  <div className="flex justify-between text-gray-700">
+                    <span>Total Amount:</span>
+                    <span className="font-mono font-bold text-black">{money(totalAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-800">
+                    <span>Paid Amount:</span>
+                    <span className="font-mono font-bold">{money(paid)}</span>
+                  </div>
+                  <div className="flex justify-between text-red-700 border-t border-gray-300 pt-1 font-bold">
+                    <span>Balance Due:</span>
+                    <span className="font-mono">{money(due)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {notes && (
+                <div className="text-xs text-gray-600">
+                  <strong className="text-black">Notes:</strong> {notes}
+                </div>
+              )}
+            </div>
+
+            {/* Action controls inside the Confirmation Popup */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => setIsConfirming(false)}
+                className="flex items-center gap-1.5"
+              >
+                <Edit3 size={15} /> Edit Invoice
+              </Button>
+              <Button
+                type="button"
+                onClick={handleFinalSubmit}
+                disabled={create.isPending}
+                className="flex items-center gap-1.5 bg-emerald-800 hover:bg-emerald-900 text-white"
+              >
+                {create.isPending ? 'Saving Invoice...' : <><Check size={16} /> Confirm & Save Invoice</>}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Add New Customer Modal */}
       {isCustomerModalOpen && (
         <Modal
           title="Add customer"
@@ -715,6 +841,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
         </Modal>
       )}
 
+      {/* Invoice Detail Modal for Viewing Past Invoices */}
       {selectedInvoice && (
         <InvoiceDetailModal 
           sale={selectedInvoice} 
