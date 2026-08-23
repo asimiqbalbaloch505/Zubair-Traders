@@ -404,6 +404,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     <div className="animate-in">
       <PageIntro eyebrow="Fast lane" title="Make a sale" detail="A clean invoice now means a clean drawer later." />
 
+      {/* Main container explicitly orders the Record Sale panel first */}
       <div className="flex flex-col gap-5">
         <section className="panel rounded-xl p-5">
           <div className="mb-5 flex items-center gap-3">
