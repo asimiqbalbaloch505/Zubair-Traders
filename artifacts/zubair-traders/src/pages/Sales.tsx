@@ -400,7 +400,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
   }, [sales.data]);
 
   return (
-    <div className="animate-in">
+    <div className="animate-in w-full flex flex-col justify-start pt-0 mt-0">
       <PageIntro eyebrow="Fast lane" title="Make a sale" detail="A clean invoice now means a clean drawer later." />
 
       {/* Main container explicitly orders the Record Sale panel first */}
