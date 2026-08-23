@@ -71,13 +71,42 @@
 
 @keyframes rise { from { opacity:0; transform:translateY(0px); } to { opacity:1; transform:translateY(0); } }
 
-/* Force top layout alignment on all page views */
+/* Force top layout alignment on primary content views */
 #root, main, [role="main"], .animate-in {
   display: flex !important;
   flex-direction: column !important;
   justify-content: flex-start !important;
   align-items: stretch !important;
   margin-top: 0 !important;
+}
+
+/* ==========================================================================
+   MODAL FIX: Strict Centering & Backdrop Overrides
+   ========================================================================== */
+/* Fixes any backdrop modal layer to stay fixed and centered in viewport */
+div[class*="fixed"][class*="inset-0"],
+div[role="dialog"],
+.modal-overlay,
+.modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 9999 !important;
+  padding: 1rem !important;
+  overflow-y: auto !important;
+}
+
+/* Ensures the inner modal content card retains auto margin and centering */
+div[role="dialog"] > div,
+.modal-overlay > div,
+.modal-content {
+  margin: auto !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1) !important;
 }
 
 /* Printable Styles */
