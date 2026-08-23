@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Plus, Check, X, Printer, FileText, ShoppingCart, AlertCircle, Building2, UserPlus, Edit3
+  Plus, Check, X, Printer, FileText, ShoppingCart, AlertCircle, Building2, UserPlus, Edit3, CheckCircle2
 } from 'lucide-react';
 import { 
   useGetSales, getGetSalesQueryKey, 
@@ -203,7 +203,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
   const createBuyer = useCreateBuyer();
   const qc = useQueryClient();
 
-  const [done, setDone] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoice | null>(null);
 
@@ -363,7 +363,6 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
   // Actual DB post on confirmation
   const handleFinalSubmit = () => {
     setErrorMessage(null);
-    setDone(false);
 
     const dbPaymentStatus = due <= 0 ? 'PAID' : paid > 0 ? 'PARTIALLY_PAID' : 'DUE';
 
@@ -390,7 +389,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           qc.invalidateQueries({ queryKey: getGetProductsQueryKey() });
           qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
           setIsConfirming(false);
-          setDone(true);
+          setIsSuccessModalOpen(true);
           setBuyerId('');
           setItems([]);
           setPaidAmount('');
@@ -570,12 +569,6 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
             >
               <Check size={17} /> Confirm sale
             </Button>
-
-            {done && (
-              <div data-testid="status-sale-success" className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
-                <Check size={14} /> Invoice posted successfully.
-              </div>
-            )}
 
             {errorMessage && (
               <div className="flex items-center gap-2 rounded bg-destructive/10 p-2.5 text-xs font-semibold text-destructive">
@@ -779,6 +772,36 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                 className="flex items-center gap-1.5 bg-emerald-800 hover:bg-emerald-900 text-white"
               >
                 {create.isPending ? 'Saving Invoice...' : <><Check size={16} /> Confirm & Save Invoice</>}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Success Popup Modal */}
+      {isSuccessModalOpen && (
+        <Modal
+          title="Success"
+          eyebrow="System Notification"
+          onClose={() => setIsSuccessModalOpen(false)}
+        >
+          <div className="flex flex-col items-center justify-center p-6 text-center space-y-4">
+            <div className="rounded-full bg-emerald-100 p-3 text-emerald-700">
+              <CheckCircle2 size={48} />
+            </div>
+            <h3 className="text-lg font-bold text-foreground">
+              Record saved successfully
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              The sale record has been stored and inventory balances have been updated.
+            </p>
+            <div className="pt-2 w-full">
+              <Button
+                type="button"
+                onClick={() => setIsSuccessModalOpen(false)}
+                className="w-full bg-emerald-800 hover:bg-emerald-900 text-white"
+              >
+                Done
               </Button>
             </div>
           </div>
