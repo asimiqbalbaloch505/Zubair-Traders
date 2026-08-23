@@ -423,6 +423,7 @@ export function useCreateSale() {
       const due = total - paid;
       const buyerId = data.buyerId || data.buyer_id;
 
+      // 1. Insert Sales Invoice
       const { data: resInvoice, error: invError } = await supabase.from('sales_invoices').insert([{
         buyer_id: buyerId,
         total_amount: total,
@@ -434,6 +435,7 @@ export function useCreateSale() {
 
       if (invError) throw invError;
 
+      // 2. Insert Invoice Items (Database trigger will handle stock deduction)
       if (data.items && data.items.length > 0) {
         const lineItems = data.items.map((item: any) => ({
           invoice_id: resInvoice.id,
@@ -446,33 +448,9 @@ export function useCreateSale() {
 
         const { error: itemsError } = await supabase.from('sales_invoice_items').insert(lineItems);
         if (itemsError) throw itemsError;
-
-        for (const item of data.items) {
-          const prodId = item.productId || item.product_id;
-          const qtySold = Number(item.quantity || item.qty || 1);
-
-          const { data: currentProd, error: prodErr } = await supabase
-            .from('products')
-            .select('stock_quantity')
-            .eq('id', prodId)
-            .single();
-
-          if (prodErr) throw prodErr;
-
-          if (currentProd) {
-            const currentStock = Number(currentProd.stock_quantity || 0);
-            const newStock = Math.max(currentStock - qtySold, 0);
-
-            const { error: updateProdErr } = await supabase
-              .from('products')
-              .update({ stock_quantity: newStock })
-              .eq('id', prodId);
-
-            if (updateProdErr) throw updateProdErr;
-          }
-        }
       }
 
+      // 3. Update Buyer Balance
       if (buyerId && due > 0) {
         const { data: currentBuyer, error: buyerErr } = await supabase
           .from('buyers')
