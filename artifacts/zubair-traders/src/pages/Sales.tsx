@@ -38,7 +38,7 @@ export interface SalesInvoice {
   transactionTime?: string;
   created_at?: string;
   notes?: string;
-  items?: SaleItemInput[];
+  items?: any[];
 }
 
 function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
@@ -55,9 +55,36 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
   const paid = sale.paid_amount ?? sale.paidAmount ?? 0;
   const due = sale.due_amount ?? sale.dueAmount ?? Math.max(total - paid, 0);
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <Modal title={`Invoice #${cleanInvoiceNo}`} eyebrow="Sales Receipt Detail" onClose={onClose}>
-      <div className="space-y-4 text-sm printable-invoice">
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          .printable-invoice-container, .printable-invoice-container * {
+            visibility: visible !important;
+          }
+          .printable-invoice-container {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            padding: 20px !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            background: #fff !important;
+          }
+          .print-hide {
+            display: none !important;
+          }
+        }
+      `}</style>
+      <div className="space-y-4 text-sm printable-invoice-container">
         <div className="flex justify-between border-b pb-3 text-xs text-muted-foreground">
           <div>
             <span className="font-semibold text-foreground">Buyer:</span> {sale.buyerName || sale.buyer_name || 'Walk-in Buyer'}
@@ -68,7 +95,7 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
         </div>
 
         {sale.items && sale.items.length > 0 ? (
-          <div className="max-h-56 overflow-y-auto border-y py-2">
+          <div className="max-h-56 overflow-y-auto border-y py-2 print:max-h-none print:overflow-visible">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b text-muted-foreground">
@@ -79,14 +106,20 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {sale.items.map((item: SaleItemInput, idx: number) => (
-                  <tr key={idx}>
-                    <td className="py-1.5 font-medium">{item.productName}</td>
-                    <td className="py-1.5 text-center">{item.quantity}</td>
-                    <td className="py-1.5 text-right">{money(item.unitPrice)}</td>
-                    <td className="py-1.5 text-right font-mono">{money(item.totalPrice)}</td>
-                  </tr>
-                ))}
+                {sale.items.map((item: any, idx: number) => {
+                  const qty = Number(item.quantity ?? item.qty ?? 1);
+                  const uPrice = Number(item.unitPrice ?? item.unit_price ?? item.price ?? 0);
+                  const tPrice = Number(item.totalPrice ?? item.total_price ?? (qty * uPrice));
+
+                  return (
+                    <tr key={idx}>
+                      <td className="py-1.5 font-medium">{item.productName || item.product_name || 'Product'}</td>
+                      <td className="py-1.5 text-center">{qty}</td>
+                      <td className="py-1.5 text-right">{money(uPrice)}</td>
+                      <td className="py-1.5 text-right font-mono">{money(tPrice)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -117,8 +150,8 @@ function InvoiceDetailModal({ sale, onClose, Modal, Button, money }: any) {
           </div>
         )}
 
-        <div className="flex justify-end gap-2 pt-2 print:hidden">
-          <Button variant="outline" testId="button-modal-print" onClick={() => window.print()}>
+        <div className="flex justify-end gap-2 pt-2 print-hide">
+          <Button variant="outline" testId="button-modal-print" onClick={handlePrint}>
             <Printer size={15} /> Print
           </Button>
           <Button testId="button-modal-close" onClick={onClose}>
