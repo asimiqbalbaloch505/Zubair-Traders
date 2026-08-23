@@ -50,10 +50,10 @@ export function Dashboard({ PageIntro, Stat, Loading, Failed, Empty, money, onNa
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="TOTAL SALES" value={money(totalSales)} icon={Banknote} />
-        <Stat label="GROSS PROFIT" value={money(grossProfit)} icon={TrendingUp} tone="warning" />
-        <Stat label="EXPENSES LOGGED" value={money(expensesLogged)} icon={Wallet} />
+        <Stat label="Sales - Cost (PROFIT)" value={money(grossProfit)} icon={TrendingUp} tone="warning" />
+        <Stat label="EXPENSES " value={money(expensesLogged)} icon={Wallet} />
         <Stat 
-          label={isLoss ? "NET LOSS" : "NET PROFIT"} 
+          label={isLoss ? "NET LOSS" : "Total PROFIT"} 
           value={money(netProfit)} 
           icon={isLoss ? ArrowDownRight : ArrowUpRight} 
           tone={isLoss ? "destructive" : "accent"} 
