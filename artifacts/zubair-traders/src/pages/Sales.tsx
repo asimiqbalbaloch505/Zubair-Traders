@@ -352,7 +352,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               <ShoppingCart size={18} />
             </div>
             <div>
-              <h3 className="font-bold">New Sale</h3>
+              <h3 className="font-bold">Record New Sale</h3>
               <p className="text-xs text-muted-foreground">Select customer and add line items</p>
             </div>
           </div>

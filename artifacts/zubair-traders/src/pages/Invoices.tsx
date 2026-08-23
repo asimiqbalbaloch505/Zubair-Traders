@@ -457,7 +457,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
 
             {/* Invoice Footer Stamp */}
             <div className="relative text-center border-t border-gray-200 pt-3">
-              <p className="text-xs font-bold text-black">Thank you for your business!</p>
+              <p className="text-xs font-bold text-black">Thank you for being part of Zubair Traders!!</p>
               <p className="text-[10px] text-gray-500 mt-0.5">Zubair Traders • Authorized Computer Generated Receipt</p>
             </div>
 

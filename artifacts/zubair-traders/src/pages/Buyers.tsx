@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Pencil, CreditCard, HandCoins, FileText, History } from 'lucide-react';
+import { Plus, Search, Pencil, CreditCard, HandCoins, FileText } from 'lucide-react';
 import { 
   useGetBuyers, 
   getGetBuyersQueryKey, 
@@ -45,7 +45,7 @@ export function Buyers({
   // History / Ledger Modal State
   const [historyBuyer, setHistoryBuyer] = useState<any>(null);
 
-  const blank = { name: '', phone: '', cnic: '', address: '', creditLimit: '' };
+  const blank = { name: '', phone: '', cnic: '', address: '' };
   const [form, setForm] = useState(blank);
 
   // Helper map to calculate real-time live balances per buyer
@@ -128,8 +128,7 @@ export function Buyers({
             name: b.name, 
             phone: b.phone || '', 
             cnic: b.cnic || '', 
-            address: b.address || '', 
-            creditLimit: String(b.creditLimit ?? b.credit_limit ?? '') 
+            address: b.address || ''
           } 
         : blank
     );
@@ -156,9 +155,7 @@ export function Buyers({
       name: form.name,
       phone: form.phone,
       cnic: form.cnic,
-      address: form.address,
-      credit_limit: Number(form.creditLimit || 0),
-      creditLimit: Number(form.creditLimit || 0)
+      address: form.address
     };
     const finish = () => {
       qc.invalidateQueries({ queryKey: getGetBuyersQueryKey() });
@@ -252,7 +249,6 @@ export function Buyers({
                 <tr>
                   <th className="pb-3">Customer</th>
                   <th className="pb-3">Phone</th>
-                  <th className="pb-3">Credit limit</th>
                   <th className="pb-3">Current udhaar</th>
                   <th className="pb-3 text-right">Actions</th>
                 </tr>
@@ -260,7 +256,6 @@ export function Buyers({
               <tbody className="divide-y divide-border/70">
                 {list.map((b: any) => {
                   const balance = buyerBalances[String(b.id)] ?? Number(b.currentBalance ?? b.current_balance ?? 0);
-                  const limit = b.creditLimit ?? b.credit_limit ?? 0;
 
                   return (
                     <tr key={b.id} data-testid={`row-buyer-${b.id}`}>
@@ -269,7 +264,6 @@ export function Buyers({
                         <div className="text-[11px] text-muted-foreground">{b.address || 'No address'}</div>
                       </td>
                       <td className="py-3 font-mono text-xs">{b.phone || '-'}</td>
-                      <td className="py-3 font-mono">{money(limit)}</td>
                       <td className="py-3">
                         <span className={`font-mono font-bold ${balance > 0 ? 'text-accent' : 'text-emerald-700'}`}>
                           {money(balance)}
@@ -333,7 +327,6 @@ export function Buyers({
               <Field label="CNIC" name="buyer-cnic" value={form.cnic} onChange={(v: string) => setForm({ ...form, cnic: v })} />
             </div>
             <Field label="Address" name="buyer-address" value={form.address} onChange={(v: string) => setForm({ ...form, address: v })} />
-            <Field label="Credit limit" name="buyer-limit" type="number" value={form.creditLimit} onChange={(v: string) => setForm({ ...form, creditLimit: v })} required />
             <Button type="submit" disabled={create.isPending || update.isPending} testId="button-save-buyer">
               {create.isPending || update.isPending ? 'Saving…' : 'Save customer'}
             </Button>
