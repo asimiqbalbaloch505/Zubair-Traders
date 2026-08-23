@@ -217,11 +217,12 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
   const [itemQty, setItemQty] = useState('1');
   const [itemUnitPrice, setItemUnitPrice] = useState('');
 
-  // Add Customer Modal State
+  // Add Customer Modal State matching Customer Book Form
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
-  const [newCustomerCity, setNewCustomerCity] = useState('');
+  const [newCustomerCnic, setNewCustomerCnic] = useState('');
+  const [newCustomerAddress, setNewCustomerAddress] = useState('');
   const [customerModalError, setCustomerModalError] = useState<string | null>(null);
 
   const openCustomerModal = () => {
@@ -257,8 +258,9 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
 
     const payload = {
       name: newCustomerName.trim(),
-      phone: newCustomerPhone.trim() || null,
-      city: newCustomerCity.trim() || null,
+      phone: newCustomerPhone.trim(),
+      cnic: newCustomerCnic.trim(),
+      address: newCustomerAddress.trim(),
     };
 
     createBuyer.mutate(
@@ -269,11 +271,13 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           setIsCustomerModalOpen(false);
           setNewCustomerName('');
           setNewCustomerPhone('');
-          setNewCustomerCity('');
+          setNewCustomerCnic('');
+          setNewCustomerAddress('');
 
           // Select newly created customer directly if ID returned
-          if (data && data.id) {
-            setBuyerId(String(data.id));
+          const created = Array.isArray(data) ? data[0] : data;
+          if (created && created.id) {
+            setBuyerId(String(created.id));
           }
         },
         onError: (err: any) => {
@@ -655,37 +659,44 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
         </section>
       </div>
 
-      {/* Add New Customer Modal */}
+      {/* Add New Customer Modal (Matches Customer Book form) */}
       {isCustomerModalOpen && (
         <Modal
-          title="Add New Customer"
-          eyebrow="Quick Setup"
+          title="Add customer"
+          eyebrow="CUSTOMER BOOK"
           onClose={() => setIsCustomerModalOpen(false)}
         >
           <form onSubmit={handleCreateCustomer} className="grid gap-4 pt-2">
             <Field
-              label="Customer / Shop Name"
+              label="Name"
               name="new-customer-name"
               value={newCustomerName}
               onChange={setNewCustomerName}
               required
-              placeholder="e.g. Madina General Store"
             />
 
-            <Field
-              label="Phone Number"
-              name="new-customer-phone"
-              value={newCustomerPhone}
-              onChange={setNewCustomerPhone}
-              placeholder="0300-1234567"
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Phone"
+                name="new-customer-phone"
+                value={newCustomerPhone}
+                onChange={setNewCustomerPhone}
+                required
+              />
+
+              <Field
+                label="CNIC"
+                name="new-customer-cnic"
+                value={newCustomerCnic}
+                onChange={setNewCustomerCnic}
+              />
+            </div>
 
             <Field
-              label="City / Address"
-              name="new-customer-city"
-              value={newCustomerCity}
-              onChange={setNewCustomerCity}
-              placeholder="e.g. Lahore"
+              label="Address"
+              name="new-customer-address"
+              value={newCustomerAddress}
+              onChange={setNewCustomerAddress}
             />
 
             {customerModalError && (
@@ -695,16 +706,9 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-3 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsCustomerModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createBuyer.isPending}>
-                {createBuyer.isPending ? 'Saving…' : 'Save Customer'}
+            <div className="pt-2">
+              <Button type="submit" disabled={createBuyer.isPending} className="w-full h-11 bg-emerald-800 text-white hover:bg-emerald-900">
+                {createBuyer.isPending ? 'Saving…' : 'Save customer'}
               </Button>
             </div>
           </form>

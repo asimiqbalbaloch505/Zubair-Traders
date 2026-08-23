@@ -189,9 +189,9 @@ export function useGetBuyers(_options?: any) {
       return (data || []).map(b => ({
         id: b.id,
         name: b.name,
-        phone: b.phone,
-        cnic: b.cnic,
-        address: b.address,
+        phone: b.phone || '',
+        cnic: b.cnic || '',
+        address: b.address || '',
         currentBalance: b.current_balance ?? b.currentBalance ?? 0,
       }));
     },
@@ -204,9 +204,9 @@ export function useCreateBuyer() {
     mutationFn: async ({ data }: { data: any }) => {
       const { data: res, error } = await supabase.from('buyers').insert([{
         name: data.name,
-        phone: data.phone,
-        cnic: data.cnic,
-        address: data.address,
+        phone: data.phone || '',
+        cnic: data.cnic || '', // Prevents NOT NULL violation when CNIC field is omitted
+        address: data.address || '',
         current_balance: 0,
       }]).select();
       if (error) throw error;
@@ -222,9 +222,9 @@ export function useUpdateBuyer() {
     mutationFn: async ({ id, data }: { id: string | number; data: any }) => {
       const { data: res, error } = await supabase.from('buyers').update({
         name: data.name,
-        phone: data.phone,
-        cnic: data.cnic,
-        address: data.address,
+        phone: data.phone || '',
+        cnic: data.cnic || '',
+        address: data.address || '',
       }).eq('id', id).select();
       if (error) throw error;
       return res;
