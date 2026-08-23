@@ -227,7 +227,6 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
 
   const openCustomerModal = () => {
     setIsCustomerModalOpen(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleProductSelect = (productId: string) => {
