@@ -526,43 +526,83 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         </Modal>
       )}
 
-      {/* Invoice Detail Modal */}
+      {/* Invoice Detail Modal - Updated Design */}
       {selectedInvoice && (
         <Modal
-          title={`Invoice #${String(selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.id).replace(/^INV-?/i, '')}`}
-          eyebrow="Invoice Details"
+          title=""
           onClose={() => setSelectedInvoice(null)}
         >
-          <div className="space-y-4 text-sm printable-invoice">
-            <div className="flex justify-between border-b pb-3 text-xs text-muted-foreground">
+          <div className="space-y-6 text-xs printable-invoice p-2">
+            
+            {/* Header / Branding Bar */}
+            <div className="flex items-start justify-between border-b border-border pb-4">
               <div>
-                <span className="font-semibold text-foreground">Client:</span>{' '}
-                {selectedInvoice.buyerName || selectedInvoice.buyer_name || 'Walk-in Buyer'}
+                <span className="inline-block rounded bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary mb-1">
+                  Sales Invoice
+                </span>
+                <h3 className="font-mono text-xl font-extrabold tracking-tight text-foreground">
+                  #{String(selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.id).replace(/^INV-?/i, '')}
+                </h3>
               </div>
-              <div>
-                <span className="font-semibold text-foreground">Date:</span>{' '}
-                {timeDate(selectedInvoice.created_at || selectedInvoice.transactionTime)}
+              <div className="text-right">
+                <span
+                  className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
+                    (selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0) >= (selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0)
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : (selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0) > 0
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}
+                >
+                  {(selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0) >= (selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0)
+                    ? 'Paid in Full'
+                    : (selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0) > 0
+                    ? 'Partially Paid'
+                    : 'Unpaid'}
+                </span>
               </div>
             </div>
 
+            {/* Customer & Transaction Info Cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-border/80 bg-muted/30 p-3 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Billed To</span>
+                <p className="font-semibold text-foreground text-sm leading-tight">
+                  {selectedInvoice.buyerName || selectedInvoice.buyer_name || 'Walk-in Buyer'}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-border/80 bg-muted/30 p-3 space-y-1 text-right">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Date Issued</span>
+                <p className="font-medium text-foreground text-xs leading-tight">
+                  {timeDate(selectedInvoice.created_at || selectedInvoice.transactionTime)}
+                </p>
+              </div>
+            </div>
+
+            {/* Line Items Section */}
             {selectedInvoice.items && selectedInvoice.items.length > 0 ? (
-              <div className="max-h-56 overflow-y-auto border-y py-2">
+              <div className="overflow-hidden rounded-lg border border-border">
                 <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b text-muted-foreground">
-                      <th className="pb-1">Item Description</th>
-                      <th className="pb-1 text-center">Qty</th>
-                      <th className="pb-1 text-right">Unit Price</th>
-                      <th className="pb-1 text-right">Subtotal</th>
+                  <thead className="bg-muted/70 text-[10px] uppercase font-bold text-muted-foreground border-b border-border">
+                    <tr>
+                      <th className="py-2.5 px-3">Item Description</th>
+                      <th className="py-2.5 px-2 text-center">Qty</th>
+                      <th className="py-2.5 px-3 text-right">Unit Price</th>
+                      <th className="py-2.5 px-3 text-right">Subtotal</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-border/60">
                     {selectedInvoice.items.map((item: any, idx: number) => (
-                      <tr key={idx}>
-                        <td className="py-1.5 font-medium">{item.productName || item.product_name}</td>
-                        <td className="py-1.5 text-center">{item.quantity}</td>
-                        <td className="py-1.5 text-right">{money(item.unitPrice ?? item.unit_price ?? 0)}</td>
-                        <td className="py-1.5 text-right font-mono">
+                      <tr key={idx} className="hover:bg-muted/20">
+                        <td className="py-2.5 px-3 font-medium text-foreground">
+                          {item.productName || item.product_name}
+                        </td>
+                        <td className="py-2.5 px-2 text-center font-mono">{item.quantity}</td>
+                        <td className="py-2.5 px-3 text-right font-mono text-muted-foreground">
+                          {money(item.unitPrice ?? item.unit_price ?? 0)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-foreground">
                           {money(item.totalPrice ?? item.total_price ?? 0)}
                         </td>
                       </tr>
@@ -571,41 +611,46 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                 </table>
               </div>
             ) : (
-              <div className="rounded bg-muted p-3 text-center text-xs text-muted-foreground">
-                No itemized product lines attached to this invoice record.
+              <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                No itemized product details attached to this record.
               </div>
             )}
 
-            <div className="space-y-1.5 rounded-lg bg-muted/60 p-3 text-xs">
-              <div className="flex justify-between">
-                <span>Total Amount:</span>
-                <span className="font-mono font-bold">
-                  {money(selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0)}
-                </span>
-              </div>
-              <div className="flex justify-between text-emerald-700">
-                <span>Paid Amount:</span>
-                <span className="font-mono font-bold">
-                  {money(selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0)}
-                </span>
-              </div>
-              <div className="flex justify-between text-destructive">
-                <span>Balance Due:</span>
-                <span className="font-mono font-bold">
-                  {money(
-                    (selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0) -
-                      (selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0)
-                  )}
-                </span>
+            {/* Summary Totals */}
+            <div className="flex justify-end pt-1">
+              <div className="w-full sm:w-64 space-y-2 rounded-lg border border-border bg-card p-3.5">
+                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                  <span>Total Amount</span>
+                  <span className="font-mono font-bold text-foreground">
+                    {money(selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-emerald-600">
+                  <span>Amount Paid</span>
+                  <span className="font-mono font-bold">
+                    {money(selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0)}
+                  </span>
+                </div>
+                <div className="border-t border-border pt-2 flex justify-between items-center text-xs text-destructive font-semibold">
+                  <span>Balance Due</span>
+                  <span className="font-mono text-sm font-extrabold">
+                    {money(
+                      (selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0) -
+                        (selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0)
+                    )}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 print:hidden">
-              <Button variant="outline" onClick={() => window.print()}>
-                <Printer size={15} /> Print
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 border-t border-border pt-4 print:hidden">
+              <Button variant="outline" onClick={() => window.print()} className="gap-1.5">
+                <Printer size={14} /> Print Receipt
               </Button>
               <Button onClick={() => setSelectedInvoice(null)}>Close</Button>
             </div>
+
           </div>
         </Modal>
       )}
