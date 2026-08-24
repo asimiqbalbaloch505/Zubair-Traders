@@ -68,7 +68,11 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
 
     const purchaseList = (purchases.data || []).map((pur: any) => {
       const supplierName = pur.supplierName || pur.suppliers?.name || pur.supplier_name || 'Walk-in / Cash Purchase';
-      const purNo = pur.id ? `PUR-${pur.id}` : 'PUR-INV';
+      const purNo = pur.purchaseNumber || pur.purchase_number 
+  ? `PUR-${pur.purchase_number || pur.purchaseNumber}` 
+  : pur.id 
+  ? `PUR-${pur.id}` 
+  : 'PUR-INV';
       const recordDate = pur.created_at || pur.transaction_time || pur.transactionTime || pur.date;
 
       return {
@@ -226,8 +230,8 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
               </thead>
               <tbody className="divide-y divide-border/70">
                 {filteredInvoices.map((inv: any) => {
-                  const invNo = inv.invoiceNumber || inv.invoice_number || inv.id;
-                  const cleanNum = String(invNo).replace(/^INV-?/i, '');
+                  const invNo = inv.invoiceNumber || inv.invoice_number || inv.purchaseNumber || inv.purchase_number || inv.id;
+const cleanNum = String(invNo).replace(/^(INV|PUR|REC)-?/i, '');
                   const customer = inv.buyerName || inv.buyer_name || 'Walk-in Customer';
                   const date = inv.created_at || inv.transactionTime || inv.transaction_time || inv.date;
                   const total = inv.totalAmount ?? inv.total_amount ?? 0;
@@ -299,8 +303,8 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
       {selectedInvoice && (
         <Modal
           title={`${selectedInvoice.displayType} #${String(
-            selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.id
-          ).replace(/^INV-?/i, '')}`}
+  selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.purchaseNumber || selectedInvoice.id
+).replace(/^(INV|PUR|REC)-?/i, '')}`}
           eyebrow={
             selectedInvoice.recordType === 'udhaar'
               ? 'Udhaar Payment Receipt'
@@ -338,7 +342,7 @@ export function Invoices({ PageIntro, Button, Modal, Loading, Failed, Empty, mon
                   {selectedInvoice.recordType === 'purchase' ? 'Purchase Invoice' : 'Tax Invoice'}
                 </span>
                 <p className="text-xs text-gray-600 font-mono mt-1">
-                  Inv #: {String(selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.id).replace(/^INV-?/i, '')}
+                  Inv #: {String(selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.purchaseNumber || selectedInvoice.id).replace(/^(INV|PUR|REC)-?/i, '')}
                 </p>
               </div>
             </div>
