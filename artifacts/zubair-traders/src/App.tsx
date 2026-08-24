@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { 
   ShoppingCart, Users, Package, Truck, Wallet, 
   HandCoins, BarChart2, LayoutDashboard, Loader2, AlertCircle, Inbox, X,
-  FileText, BookOpen
+  FileText, BookOpen, LogOut
 } from 'lucide-react';
 
 import { Sales } from './pages/Sales';
@@ -14,6 +14,11 @@ import { Expenses } from './pages/Expenses';
 import { Invoices } from './pages/Invoices';
 import { Dashboard } from './pages/Dashboard';
 import { CustomerLedger } from './pages/CustomerLedger';
+import { Hero } from './pages/Hero';
+import { Login } from './pages/Login';
+
+// Optional: import your existing supabase client
+import { supabase } from './lib/supabase'; // Adjust path if needed
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -166,7 +171,11 @@ function Empty({ title, detail, action }: any) {
 }
 
 function MainApp() {
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  // App view flow: 'hero' -> 'login' -> 'app'
+  const [view, setView] = useState<'hero' | 'login' | 'app'>('hero');
+  
+  // Default to 'sales' tab upon authenticating
+  const [activeTab, setActiveTab] = useState<string>('sales');
   const [selectedLedgerBuyerId, setSelectedLedgerBuyerId] = useState<string | null>(null);
 
   const navItems = [
@@ -202,43 +211,73 @@ function MainApp() {
     onNavigateToLedger: navigateToLedger,
   };
 
+  // Render Hero Page
+  if (view === 'hero') {
+    return <Hero onGetStarted={() => setView('login')} />;
+  }
+
+  // Render Login Screen
+  if (view === 'login') {
+    return (
+      <Login
+        supabaseClient={supabase}
+        onLoginSuccess={() => {
+          setActiveTab('sales');
+          setView('app');
+        }}
+      />
+    );
+  }
+
+  // Render Main Application
   return (
     <div className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
       <header className="sticky top-0 z-40 border-b border-border/80 bg-background/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-         <div className="flex items-center gap-3">
-  <img 
-    src="/gemini-svg.svg" 
-    alt="Zubair Traders Logo" 
-    className="h-10 w-10 object-contain"
-  />
-  <div>
-    <div className="font-bold tracking-tight text-foreground">Zubair Traders</div>
-    <div className="text-[10px] font-medium text-muted-foreground">Wholesale & Sales Ledger</div>
-  </div>
-</div>
+          <div className="flex items-center gap-3">
+            <img 
+              src="/gemini-svg.svg" 
+              alt="Zubair Traders Logo" 
+              className="h-10 w-10 object-contain"
+            />
+            <div>
+              <div className="font-bold tracking-tight text-foreground">Zubair Traders</div>
+              <div className="text-[10px] font-medium text-muted-foreground">Wholesale & Sales Ledger</div>
+            </div>
+          </div>
 
-          <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  data-testid={`nav-tab-${item.id}`}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground font-semibold'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
-                >
-                  <Icon size={15} />
-                  {item.label}
-                </button>
-              );
-            })}
-          </nav>
+          <div className="flex items-center gap-3">
+            <nav className="hidden md:flex items-center gap-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    data-testid={`nav-tab-${item.id}`}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground font-semibold'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    }`}
+                  >
+                    <Icon size={15} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
+
+            <button
+              onClick={() => setView('hero')}
+              title="Sign Out"
+              className="flex items-center gap-1 text-xs font-medium text-destructive hover:bg-destructive/10 rounded-lg px-2.5 py-1.5 transition"
+            >
+              <LogOut size={15} />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+          </div>
         </div>
 
         <nav className="flex overflow-x-auto border-t border-border/50 px-2 py-1 md:hidden">
