@@ -811,43 +811,9 @@ export function useCreateExpense() {
   });
 }
 
-export function useGetLoans(_options?: any) {
-  return useQuery({
-    queryKey: ['loans'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('loans').select('*');
-      if (error) throw error;
-      return (data || []).map(l => ({
-        id: l.id,
-        personName: l.person_name,
-        phone: l.phone,
-        loanType: l.loan_type,
-        amount: l.amount,
-        balanceRemaining: l.balance_remaining,
-        dateGiven: l.date_given || l.created_at,
-      }));
-    },
-  });
-}
 
-export function useCreateLoan() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ data }: { data: any }) => {
-      const { data: res, error } = await supabase.from('loans').insert([{
-        person_name: data.personName,
-        phone: data.phone,
-        loan_type: data.loanType,
-        amount: data.amount,
-        balance_remaining: data.amount,
-        description: data.description,
-      }]).select();
-      if (error) throw error;
-      return res;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['loans'] }),
-  });
-}
+
+
 
 export function useHealthCheck(_options?: any) {
   return useQuery({
