@@ -11,7 +11,7 @@ import {
   useCreateBuyer
 } from '../hooks/useSupabaseData';
 import { useQueryClient } from '@tanstack/react-query';
-import { InvoiceModal } from '../components/InvoiceModal';
+import { InvoiceModal } from '../components/invoiceModal';
 
 export interface SaleItemInput {
   productId: number | string;
