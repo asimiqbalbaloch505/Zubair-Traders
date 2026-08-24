@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 interface HeroProps {
   onGetStarted: () => void;
@@ -29,17 +29,14 @@ export function Hero({ onGetStarted }: HeroProps) {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % bakerySlides.length);
-    }, 6000);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
-
-  const handleNext = () => setCurrentIndex((prev) => (prev + 1) % bakerySlides.length);
-  const handlePrev = () => setCurrentIndex((prev) => (prev - 1 + bakerySlides.length) % bakerySlides.length);
 
   return (
     <div className="relative min-h-screen w-full font-sans select-none overflow-hidden flex flex-col justify-between">
       
-      {/* FULL-SCREEN BACKGROUND IMAGE CAROUSEL */}
+      {/* FULL-SCREEN BACKGROUND IMAGES (Vibrant & Visible) */}
       <div className="absolute inset-0 pointer-events-none z-0">
         {bakerySlides.map((slide, idx) => (
           <div
@@ -51,24 +48,25 @@ export function Hero({ onGetStarted }: HeroProps) {
           />
         ))}
 
-        {/* Bright White Translucent Overlay for Crisp Legibility */}
-        <div className="absolute inset-0 bg-white/85 backdrop-blur-[2px]" />
+        {/* Minimal Overlay so background images are clear */}
+        <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-white/90 via-white/40 to-white/80" />
       </div>
 
       {/* TOP HEADER */}
-      <header className="relative z-10 w-full px-6 py-5 border-b border-slate-200/60 bg-white/50 backdrop-blur-md">
+      <header className="relative z-10 w-full px-6 py-5 border-b border-slate-200/50 bg-white/60 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img
               src="/gemini-svg.svg"
               alt="Zubair Traders Logo"
-              className="h-11 w-11 object-contain drop-shadow-xs"
+              className="h-11 w-11 object-contain drop-shadow-sm"
             />
             <div>
-              <h1 className="text-xl font-black text-slate-900 tracking-tight leading-tight">
+              <h1 className="text-xl font-black text-slate-950 tracking-tight leading-tight">
                 Zubair Traders
               </h1>
-              <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">
+              <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">
                 Bakery Products & Wholesale
               </p>
             </div>
@@ -83,22 +81,22 @@ export function Hero({ onGetStarted }: HeroProps) {
         </div>
       </header>
 
-      {/* MAIN CENTER CONTENT (Structured Layout, No Overlaps) */}
+      {/* MAIN CENTER CONTENT */}
       <main className="relative z-10 max-w-4xl mx-auto px-6 py-12 flex-1 flex flex-col items-center justify-center text-center">
         
-        {/* Dynamic Main Title */}
+        {/* Dynamic Title */}
         <div className="min-h-[100px] sm:min-h-[120px] flex items-center justify-center">
-          <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-tight max-w-3xl transition-all duration-500 drop-shadow-2xs">
+          <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-950 tracking-tight leading-tight max-w-3xl transition-all duration-500 drop-shadow-sm">
             {bakerySlides[currentIndex].title}
           </h2>
         </div>
 
         {/* Dynamic Subtitle */}
-        <p className="mt-4 text-sm sm:text-lg text-slate-700 max-w-xl font-medium leading-relaxed min-h-[60px]">
+        <p className="mt-4 text-sm sm:text-lg text-slate-900 max-w-xl font-semibold leading-relaxed min-h-[60px] drop-shadow-xs">
           {bakerySlides[currentIndex].subtitle}
         </p>
 
-        {/* Centered Get Started Button */}
+        {/* Centered Action Button */}
         <div className="mt-8">
           <button
             onClick={onGetStarted}
@@ -109,39 +107,10 @@ export function Hero({ onGetStarted }: HeroProps) {
           </button>
         </div>
 
-        {/* Slide Controls & Indicator */}
-        <div className="mt-12 flex items-center gap-4 bg-white/80 border border-slate-200/80 px-4 py-2 rounded-full shadow-xs backdrop-blur-md">
-          <button
-            onClick={handlePrev}
-            className="p-1.5 text-slate-700 hover:text-slate-900 transition"
-          >
-            <ChevronLeft size={20} />
-          </button>
-
-          <div className="flex items-center gap-2">
-            {bakerySlides.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentIndex(idx)}
-                className={`h-2.5 rounded-full transition-all ${
-                  idx === currentIndex ? 'w-7 bg-amber-500' : 'w-2.5 bg-slate-300'
-                }`}
-              />
-            ))}
-          </div>
-
-          <button
-            onClick={handleNext}
-            className="p-1.5 text-slate-700 hover:text-slate-900 transition"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-
       </main>
 
       {/* FOOTER */}
-      <footer className="relative z-10 w-full py-4 bg-white/50 border-t border-slate-200/60 backdrop-blur-md text-center text-xs text-slate-600 font-medium">
+      <footer className="relative z-10 w-full py-4 bg-white/60 border-t border-slate-200/50 backdrop-blur-md text-center text-xs text-slate-900 font-semibold">
         © Zubair Traders • Bakery Management & Distribution System
       </footer>
 
