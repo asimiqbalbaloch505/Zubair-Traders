@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Search, Filter, Calendar, FileText, Printer, Building2, UserCheck, CreditCard, Banknote, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useGetBuyers, useGetSales, useGetBuyerPayments } from '../hooks/useSupabaseData';
 import { supabase } from '../lib/supabase';
-import { InvoiceModal } from '../components/InvoiceModal';
+import { InvoiceModal } from '../components/invoiceModal';
 
 interface CustomerLedgerProps {
   PageIntro: React.ComponentType<any>;
