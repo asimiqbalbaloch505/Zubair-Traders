@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2, Printer } from 'lucide-react';
+import { Printer } from 'lucide-react';
 
 export interface InvoiceModalProps {
   sale: any;
@@ -38,19 +38,24 @@ export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceMod
           </span>
         </div>
 
-        {/* Professional Header */}
+        {/* Professional Header with Logo */}
         <div className="relative flex justify-between items-start border-b border-black/20 pb-4 mb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Building2 size={24} className="text-black" />
-              <h1 className="text-xl font-bold uppercase tracking-wider text-black">
+          <div className="flex items-center gap-3">
+            <img 
+              src="/gemini-svg.svg" 
+              alt="Zubair Traders Logo" 
+              className="h-10 w-10 object-contain shrink-0" 
+            />
+            <div>
+              <h1 className="text-xl font-bold uppercase tracking-wider text-black leading-tight">
                 Zubair Traders
               </h1>
+              <p className="text-xs text-gray-600 font-medium">
+                Bakery & General Traders Management
+              </p>
             </div>
-            <p className="text-xs text-gray-600 mt-1 font-medium">
-              Bakery & General Traders Management
-            </p>
           </div>
+
           <div className="text-right">
             <span className="inline-block px-3 py-1 bg-black text-white text-xs font-bold uppercase rounded">
               Tax Invoice
