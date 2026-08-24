@@ -3,7 +3,18 @@ import { FileText, Printer, Search, Calendar, X, ArrowDownRight, ArrowUpRight, B
 import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
 import { supabase } from '../lib/supabase';
 
-export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
+interface CustomerLedgerProps {
+  PageIntro: React.ComponentType<any>;
+  Button: React.ComponentType<any>;
+  Modal: React.ComponentType<any>;
+  Loading: React.ComponentType<any>;
+  Failed: React.ComponentType<{ onRetry: () => void }>;
+  Empty: React.ComponentType<{ title: string; detail: string }>;
+  money: (amount: number) => string;
+  timeDate: (dateStr: string) => string;
+}
+
+export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: CustomerLedgerProps) {
   const sales = useGetSales();
   const buyers = useGetBuyers();
   const payments = useGetBuyerPayments();
@@ -22,7 +33,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
   const [receiveAmount, setReceiveAmount] = useState<string>('');
   const [paymentNotes, setPaymentNotes] = useState<string>('');
 
-  // Calculate Base Ledger Metrics per Buyer
+  // Calculate Base Ledger Metrics per Buyer (All Time Cumulative Data)
   const buyerLedgerData = useMemo(() => {
     if (!buyers.data) return [];
 
@@ -83,6 +94,8 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
   // Date Filtering Helper
   const isDateInFilterRange = (itemDateStr: string) => {
     if (!itemDateStr) return false;
+    if (datePreset === 'all') return true;
+
     const itemDate = new Date(itemDateStr);
     const now = new Date();
 
@@ -114,10 +127,10 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
       return itemDate.toISOString().split('T')[0] === customDate;
     }
 
-    return true; // 'all' or fallback
+    return true;
   };
 
-  // Filtered Raw Sales & Payments (used for Summary Cards & Table)
+  // Filtered Raw Sales & Payments
   const filteredSales = useMemo(() => {
     const rawSales = activeBuyer ? activeBuyer.invoices : (sales.data || []);
     return rawSales.filter((s: any) => isDateInFilterRange(s.created_at || s.transactionTime || s.transaction_time));
@@ -128,7 +141,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     return rawPayments.filter((p: any) => isDateInFilterRange(p.created_at || p.payment_date || p.transactionTime));
   }, [activeBuyer, payments.data, datePreset, customDate]);
 
-  // Dynamically Calculated Metrics based on Customer + Date Filter
+  // Dynamic Metrics: Sales & Collections reflect date range; Udhaar reflects real overall outstanding balance
   const summaryMetrics = useMemo(() => {
     const totalSales = filteredSales.reduce(
       (sum: number, s: any) => sum + Number(s.totalAmount ?? s.total_amount ?? 0),
@@ -147,13 +160,15 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
 
     const totalCollected = initialDown + directReceipts;
 
-    // Dynamically calculate Udhaar based on filtered date range and selected customer
-    const totalUdhaar = Math.max(0, totalSales - totalCollected);
+    // Udhaar is calculated overall to ensure total debt isn't hidden by date filters
+    const totalUdhaar = activeBuyer
+      ? activeBuyer.totalUdhaar
+      : buyerLedgerData.reduce((acc: number, b: any) => acc + b.totalUdhaar, 0);
 
     return { totalSales, totalCollected, totalUdhaar };
-  }, [filteredSales, filteredPayments]);
+  }, [filteredSales, filteredPayments, activeBuyer, buyerLedgerData]);
 
-  // Combined Merged Transactions
+  // Merged Transactions List
   const transactionsList = useMemo(() => {
     const invs = filteredSales.map((inv: any) => {
       const total = Number(inv.totalAmount ?? inv.total_amount ?? 0);
@@ -210,7 +225,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     return merged;
   }, [filteredSales, filteredPayments, activeBuyer, searchQuery]);
 
-  // Open Receive Payment Modal
+  // Open Payment Modal
   const handleOpenReceivePayment = () => {
     if (!activeBuyer) return;
     setReceiveAmount(String(activeBuyer.totalUdhaar || ''));
@@ -236,12 +251,12 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
 
       if (error) throw error;
 
-      if (payments.refetch) payments.refetch();
-      if (sales.refetch) sales.refetch();
+      if (payments.refetch) await payments.refetch();
+      if (sales.refetch) await sales.refetch();
       setIsPaymentModalOpen(false);
     } catch (err) {
       console.error('Failed to submit payment:', err);
-    } finally {
+    } font-semibold {
       setIsSubmittingPayment(false);
     }
   };
@@ -298,7 +313,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
             </div>
           </div>
 
-          {/* Show 'Receive Payment' inside Udhaar card ONLY if a customer is selected & Udhaar > 0 */}
           {activeBuyer && summaryMetrics.totalUdhaar > 0 && (
             <div className="mt-3 pt-2 border-t border-destructive/20">
               <button
@@ -406,7 +420,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
               <tbody className="divide-y divide-border/70">
                 {transactionsList.map((tx: any) => (
                   <tr
-                    key={tx.id}
+                    key={`${tx.type}-${tx.id}`}
                     onClick={() => tx.type === 'INVOICE' && setSelectedInvoice(tx.raw)}
                     className={`transition ${tx.type === 'INVOICE' ? 'cursor-pointer hover:bg-muted/40' : ''}`}
                   >
