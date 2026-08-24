@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, BookOpen, ShoppingBag, Package, ShieldCheck } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 interface HeroProps {
   onGetStarted: () => void;
@@ -22,128 +22,79 @@ export function Hero({ onGetStarted }: HeroProps) {
   }, []);
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between bg-slate-50 text-slate-900 font-sans selection:bg-slate-900 selection:text-white">
+    <div className="relative min-h-screen w-full overflow-hidden bg-slate-950 font-sans">
       
-      {/* Light Background Image Carousel with High Fade */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {/* Background Image Carousel with Smooth Fade & Scale Transition */}
+      <div className="absolute inset-0 pointer-events-none">
         {backgroundImages.map((img, idx) => (
           <div
             key={img}
-            className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ease-in-out ${
-              idx === currentImageIndex ? 'opacity-[0.07] scale-105' : 'opacity-0 scale-100'
+            className={`absolute inset-0 bg-cover bg-center transition-all duration-1000 ease-in-out ${
+              idx === currentImageIndex ? 'opacity-80 scale-100' : 'opacity-0 scale-105'
             }`}
             style={{
               backgroundImage: `url('${img}')`,
-              transitionProperty: 'opacity, transform',
-              transitionDuration: '1200ms',
             }}
           />
         ))}
-        {/* Subtle Ambient Radial Glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-slate-200/50 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Gradient Overlay: Deep slate-blue tint keeping background images clear */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/40" />
       </div>
 
-      {/* Top Navigation */}
-      <header className="relative z-10 mx-auto max-w-7xl w-full flex items-center justify-between px-6 py-5">
-        <div className="flex items-center gap-3">
-          <img
-            src="/gemini-svg.svg"
-            alt="Zubair Traders Logo"
-            className="h-10 w-10 object-contain"
-          />
-          <div>
-            <div className="font-bold tracking-tight text-slate-900 text-base leading-tight">
-              Zubair Traders
-            </div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-              Wholesale & Sales Ledger
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={onGetStarted}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-lg shadow-xs transition active:scale-[0.98]"
-        >
-          Sign In
-        </button>
-      </header>
-
-      {/* Hero Body */}
-      <main className="relative z-10 mx-auto max-w-4xl w-full px-6 py-12 flex flex-col items-center text-center">
+      {/* Main Content Container - Aligned to Top Left */}
+      <div className="relative z-10 flex min-h-screen flex-col justify-between p-6 sm:p-12 lg:p-16 max-w-4xl">
         
-        {/* Subtle Status Pill */}
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3.5 py-1 text-xs font-medium text-slate-600 shadow-2xs backdrop-blur-md">
-          <ShieldCheck size={14} className="text-emerald-600" />
-          <span>Verified Wholesale Operating System</span>
-        </div>
-
-        {/* Main Headline */}
-        <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 max-w-2xl leading-tight sm:leading-tight">
-          Effortless management for your wholesale business.
-        </h1>
-
-        {/* Subtitle */}
-        <p className="mt-4 text-xs sm:text-sm text-slate-600 max-w-lg leading-relaxed font-normal">
-          Keep track of customer Khata balances, daily sales transactions, stock quantities, and printable invoices in one clean dashboard.
-        </p>
-
-        {/* Action Button */}
-        <div className="mt-8">
-          <button
-            onClick={onGetStarted}
-            className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-6 py-3 rounded-lg shadow-md transition active:scale-[0.98]"
-          >
-            Open Management Suite <ArrowRight size={15} />
-          </button>
-        </div>
-
-        {/* Minimalist Feature Cards */}
-        <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full text-left">
+        {/* Top-Left Section: Logo + Catchy Headline */}
+        <div className="space-y-6">
           
-          <div className="rounded-xl border border-slate-200/80 bg-white/80 p-5 shadow-2xs backdrop-blur-xs transition hover:border-slate-300">
-            <div className="mb-3 inline-flex rounded-lg bg-slate-100 p-2.5 text-slate-800">
-              <BookOpen size={18} />
+          {/* Brand Header */}
+          <div className="inline-flex items-center gap-3.5 rounded-2xl bg-slate-900/80 border border-slate-700/60 px-4 py-2.5 backdrop-blur-md shadow-xl">
+            <img
+              src="/gemini-svg.svg"
+              alt="Zubair Traders Logo"
+              className="h-10 w-10 object-contain shrink-0"
+            />
+            <div>
+              <h2 className="text-base font-bold text-white tracking-wide leading-tight">
+                Zubair Traders
+              </h2>
+              <p className="text-[11px] font-medium text-slate-300">
+                Wholesale & Ledger Management
+              </p>
             </div>
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Khata Ledger
-            </h2>
-            <p className="mt-1 text-[11px] text-slate-500 leading-normal">
-              Manage customer balances, dues, and ledger reports effortlessly.
+          </div>
+
+          {/* Catchy Lines */}
+          <div className="space-y-3 max-w-2xl">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-tight drop-shadow-md">
+              Powering Modern Wholesale with Precision.
+            </h1>
+            <p className="text-sm sm:text-lg text-slate-200 font-normal leading-relaxed max-w-xl drop-shadow-sm">
+              Smart sales tracking, instant customer Khata ledgers, stock management, and custom invoices—built for performance.
             </p>
           </div>
 
-          <div className="rounded-xl border border-slate-200/80 bg-white/80 p-5 shadow-2xs backdrop-blur-xs transition hover:border-slate-300">
-            <div className="mb-3 inline-flex rounded-lg bg-slate-100 p-2.5 text-slate-800">
-              <ShoppingBag size={18} />
-            </div>
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Sales Records
-            </h2>
-            <p className="mt-1 text-[11px] text-slate-500 leading-normal">
-              Record daily wholesale orders and instantly generate tax invoices.
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-200/80 bg-white/80 p-5 shadow-2xs backdrop-blur-xs transition hover:border-slate-300">
-            <div className="mb-3 inline-flex rounded-lg bg-slate-100 p-2.5 text-slate-800">
-              <Package size={18} />
-            </div>
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Stock Control
-            </h2>
-            <p className="mt-1 text-[11px] text-slate-500 leading-normal">
-              Monitor inventory levels, purchase unit costs, and reorder alerts.
-            </p>
+          {/* Single Action Button */}
+          <div className="pt-2">
+            <button
+              onClick={onGetStarted}
+              className="group inline-flex items-center gap-2.5 bg-slate-100 hover:bg-white text-slate-950 font-bold text-sm px-7 py-3.5 rounded-xl shadow-2xl transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+            >
+              Get Started
+              <ArrowRight size={16} className="transition-transform group-hover:translate-x-1 text-slate-950" />
+            </button>
           </div>
 
         </div>
-      </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-slate-200/70 py-4 text-center text-[11px] font-medium text-slate-400">
-        Zubair Traders • Business Management Platform
-      </footer>
+        {/* Footer info */}
+        <div className="text-xs text-slate-300 font-medium pt-8">
+          © Zubair Traders • Enterprise Operations
+        </div>
+
+      </div>
 
     </div>
   );
