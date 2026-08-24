@@ -207,14 +207,17 @@ function MainApp() {
       <header className="sticky top-0 z-40 border-b border-border/80 bg-background/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary font-mono font-bold text-primary-foreground">
-              ZT
-            </div>
-            <div>
-              <div className="font-bold tracking-tight text-foreground">Zubair Traders</div>
-              <div className="text-[10px] font-medium text-muted-foreground">Wholesale & Sales Ledger</div>
-            </div>
-          </div>
+          <div className="flex items-center gap-3">
+  <img 
+    src="/gemini-svg.svg" 
+    alt="Zubair Traders Logo" 
+    className="h-10 w-10 object-contain"
+  />
+  <div>
+    <div className="font-bold tracking-tight text-foreground">Zubair Traders</div>
+    <div className="text-[10px] font-medium text-muted-foreground">Wholesale & Sales Ledger</div>
+  </div>
+</div>
 
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => {
