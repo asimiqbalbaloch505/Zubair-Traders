@@ -415,7 +415,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-emerald-800 font-semibold">
-                          <ArrowDownRight size={12} /> Payment
+                          <ArrowDownRight size={12} /> Udhaar Payment
                         </span>
                       )}
                     </td>
