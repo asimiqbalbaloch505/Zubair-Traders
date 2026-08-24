@@ -506,50 +506,51 @@ export function useGetPurchases() {
       }
 
       return (data || []).map((p: any) => {
-        let status = String(p.payment_status || 'unpaid').toLowerCase();
-        if (status === 'partially_paid' || status === 'partially paid') status = 'partial';
-        if (status === 'due') status = 'unpaid';
+  let status = String(p.payment_status || 'unpaid').toLowerCase();
+  if (status === 'partially_paid' || status === 'partially paid') status = 'partial';
+  if (status === 'due') status = 'unpaid';
 
-        const mappedItems = (p.purchase_invoice_items || []).map((item: any) => {
-          const pName = item.products?.name || item.product_name || 'Item';
-          return {
-            id: item.id,
-            productId: item.product_id,
-            product_id: item.product_id,
-            productName: pName,
-            product_name: pName,
-            name: pName,
-            quantity: item.quantity,
-            qty: item.quantity,
-            unitCost: item.purchase_cost,
-            unit_cost: item.purchase_cost,
-            subtotal: item.subtotal || (item.quantity * item.purchase_cost),
-          };
-        });
+  const mappedItems = (p.purchase_invoice_items || []).map((item: any) => {
+    const pName = item.products?.name || item.product_name || 'Item';
+    return {
+      id: item.id,
+      productId: item.product_id,
+      product_id: item.product_id,
+      productName: pName,
+      product_name: pName,
+      name: pName,
+      quantity: item.quantity,
+      qty: item.quantity,
+      unitCost: item.purchase_cost,
+      unit_cost: item.purchase_cost,
+      subtotal: item.subtotal || (item.quantity * item.purchase_cost),
+    };
+  });
 
-        return {
-          id: p.id,
-          purchaseNumber: p.purchase_number ? `PUR-${p.purchase_number}` : `PUR-${p.id}`,
+  return {
+    id: p.id,
+    // Add purchaseNumber mapping:
+    purchaseNumber: p.purchase_number ? `PUR-${p.purchase_number}` : `PUR-${p.id}`,
     purchase_number: p.purchase_number,
-          supplierId: p.supplier_id,
-          supplier_id: p.supplier_id,
-          supplierName: p.suppliers?.name || p.suppliers?.company_name || 'General Supplier',
-          totalAmount: p.total_amount,
-          total_amount: p.total_amount,
-          paidAmount: p.paid_amount,
-          paid_amount: p.paid_amount,
-          dueAmount: p.due_amount ?? ((p.total_amount || 0) - (p.paid_amount || 0)),
-          due_amount: p.due_amount ?? ((p.total_amount || 0) - (p.paid_amount || 0)),
-          paymentStatus: status,
-          payment_status: status,
-          transactionTime: p.transaction_time || p.created_at,
-          transaction_time: p.transaction_time || p.created_at,
-          created_at: p.transaction_time || p.created_at,
-          notes: p.notes,
-          items: mappedItems,
-          purchase_invoice_items: mappedItems
-        };
-      });
+    supplierId: p.supplier_id,
+    supplier_id: p.supplier_id,
+    supplierName: p.suppliers?.name || p.suppliers?.company_name || 'General Supplier',
+    totalAmount: p.total_amount,
+    total_amount: p.total_amount,
+    paidAmount: p.paid_amount,
+    paid_amount: p.paid_amount,
+    dueAmount: p.due_amount ?? ((p.total_amount || 0) - (p.paid_amount || 0)),
+    due_amount: p.due_amount ?? ((p.total_amount || 0) - (p.paid_amount || 0)),
+    paymentStatus: status,
+    payment_status: status,
+    transactionTime: p.transaction_time || p.created_at,
+    transaction_time: p.transaction_time || p.created_at,
+    created_at: p.transaction_time || p.created_at,
+    notes: p.notes,
+    items: mappedItems,
+    purchase_invoice_items: mappedItems
+  };
+});
     },
   });
 }
