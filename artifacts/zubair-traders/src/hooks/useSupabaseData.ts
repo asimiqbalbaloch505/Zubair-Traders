@@ -529,6 +529,8 @@ export function useGetPurchases() {
 
         return {
           id: p.id,
+          purchaseNumber: p.purchase_number ? `PUR-${p.purchase_number}` : `PUR-${p.id}`,
+    purchase_number: p.purchase_number,
           supplierId: p.supplier_id,
           supplier_id: p.supplier_id,
           supplierName: p.suppliers?.name || p.suppliers?.company_name || 'General Supplier',
