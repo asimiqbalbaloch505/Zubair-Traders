@@ -1,8 +1,50 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, Calendar, FileText, Printer, Building2, UserCheck, CreditCard, Banknote, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Search, Filter, Calendar, FileText, Printer, Building2, UserCheck, CreditCard, Banknote, ArrowUpRight, ArrowDownRight, X } from 'lucide-react';
 import { useGetBuyers, useGetSales, useGetBuyerPayments } from '../hooks/useSupabaseData';
 import { supabase } from '../lib/supabase';
-import { InvoiceModal } from '../components/invoiceModal';
+
+// Inline Invoice Modal Component to prevent missing import errors
+function InvoiceModal({ selectedInvoice, onClose, Modal, Button, money, timeDate }: any) {
+  if (!selectedInvoice) return null;
+
+  return (
+    <Modal title="Invoice Details" eyebrow={selectedInvoice.invoiceNumber || selectedInvoice.id} onClose={onClose}>
+      <div className="space-y-4 text-xs">
+        <div className="flex justify-between border-b pb-2">
+          <div>
+            <p className="font-semibold text-muted-foreground">Customer</p>
+            <p className="font-bold text-sm">{selectedInvoice.buyerName || selectedInvoice.buyer_name || 'Walk-in Buyer'}</p>
+          </div>
+          <div className="text-right">
+            <p className="font-semibold text-muted-foreground">Date</p>
+            <p className="font-medium">{timeDate(selectedInvoice.created_at || selectedInvoice.transactionTime)}</p>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex justify-between py-1">
+            <span>Total Amount:</span>
+            <span className="font-mono font-bold">{money(selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0)}</span>
+          </div>
+          <div className="flex justify-between py-1">
+            <span>Amount Paid:</span>
+            <span className="font-mono text-emerald-600 font-bold">{money(selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0)}</span>
+          </div>
+          <div className="flex justify-between py-1 border-t pt-1">
+            <span className="font-semibold">Balance Due:</span>
+            <span className="font-mono font-bold text-red-600">
+              {money(Math.max(0, (selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0) - (selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0)))}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-3">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 interface CustomerLedgerProps {
   PageIntro: React.ComponentType<any>;
@@ -35,7 +77,6 @@ export function CustomerLedger({
   const [customDate, setCustomDate] = useState<string>('');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
 
-  // Payment Modal State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [receiveAmount, setReceiveAmount] = useState<string>('');
@@ -126,9 +167,6 @@ export function CustomerLedger({
     }
     if (datePreset === 'this_year') {
       return itemDate.getFullYear() === now.getFullYear();
-    }
-    if (datePreset === 'last_year') {
-      return itemDate.getFullYear() === now.getFullYear() - 1;
     }
     if (datePreset === 'custom' && customDate) {
       return itemDate.toISOString().split('T')[0] === customDate;
