@@ -178,8 +178,6 @@ function MainApp() {
     { id: 'products', label: 'Stock', icon: Package },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
     { id: 'expenses', label: 'Expenses', icon: Wallet },
-    { id: 'loans', label: 'Loans', icon: HandCoins },
-    { id: 'reports', label: 'Reports', icon: BarChart2 },
   ];
 
   const navigateToLedger = (buyerId?: string) => {

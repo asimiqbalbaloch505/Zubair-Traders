@@ -811,10 +811,6 @@ export function useCreateExpense() {
   });
 }
 
-
-
-
-
 export function useHealthCheck(_options?: any) {
   return useQuery({
     queryKey: ['health'],
