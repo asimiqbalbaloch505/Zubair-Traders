@@ -11,8 +11,6 @@ import { Buyers } from './pages/Buyers';
 import { Products } from './pages/Products';
 import { Suppliers } from './pages/Suppliers';
 import { Expenses } from './pages/Expenses';
-import { Loans } from './pages/Loans';
-import { Reports } from './pages/Reports';
 import { Invoices } from './pages/Invoices';
 import { Dashboard } from './pages/Dashboard';
 import { CustomerLedger } from './pages/CustomerLedger';
@@ -277,8 +275,6 @@ function MainApp() {
         {activeTab === 'products' && <Products {...commonProps} />}
         {activeTab === 'suppliers' && <Suppliers {...commonProps} />}
         {activeTab === 'expenses' && <Expenses {...commonProps} />}
-        {activeTab === 'loans' && <Loans {...commonProps} />}
-        {activeTab === 'reports' && <Reports {...commonProps} />}
       </main>
     </div>
   );
