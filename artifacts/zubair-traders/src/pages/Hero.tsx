@@ -5,93 +5,117 @@ interface HeroProps {
   onGetStarted: () => void;
 }
 
-const backgroundImages = [
-  'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1920&q=80',
-  'https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&w=1920&q=80',
-  'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&w=1920&q=80',
+const bakerySlides = [
+  {
+    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1920&q=80',
+    title: 'Freshly Baked Quality, Wholesale Reliability.',
+    subtitle: 'Streamline daily wholesale bread, flour, and pastry orders with instant digital ledger invoicing.'
+  },
+  {
+    image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=1920&q=80',
+    title: 'Precision Khata Ledger for Bakery Traders.',
+    subtitle: 'Track customer balances, credit records, and payment collection receipts in real time.'
+  },
+  {
+    image: 'https://images.unsplash.com/photo-1517433670267-08bbd4be890f?auto=format&fit=crop&w=1920&q=80',
+    title: 'Complete Control Over Bakery Stock & Supplies.',
+    subtitle: 'Monitor raw ingredient inventory, finished baked goods, and unit production costs effortlessly.'
+  }
 ];
 
 export function Hero({ onGetStarted }: HeroProps) {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % backgroundImages.length);
+      setCurrentIndex((prev) => (prev + 1) % bakerySlides.length);
     }, 6000);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-slate-950 font-sans">
+    <div className="relative min-h-screen w-full overflow-hidden bg-slate-950 font-sans select-none">
       
-      {/* Background Image Carousel with Smooth Fade & Scale Transition */}
+      {/* Background Image Carousel (Bakery Photos) */}
       <div className="absolute inset-0 pointer-events-none">
-        {backgroundImages.map((img, idx) => (
+        {bakerySlides.map((slide, idx) => (
           <div
-            key={img}
+            key={slide.image}
             className={`absolute inset-0 bg-cover bg-center transition-all duration-1000 ease-in-out ${
-              idx === currentImageIndex ? 'opacity-80 scale-100' : 'opacity-0 scale-105'
+              idx === currentIndex ? 'opacity-75 scale-100' : 'opacity-0 scale-105'
             }`}
             style={{
-              backgroundImage: `url('${img}')`,
+              backgroundImage: `url('${slide.image}')`,
             }}
           />
         ))}
 
-        {/* Gradient Overlay: Deep slate-blue tint keeping background images clear */}
+        {/* Dual Gradient Overlays to preserve text readability */}
         <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-slate-950/40" />
       </div>
 
-      {/* Main Content Container - Aligned to Top Left */}
+      {/* Main Container - Aligned Top-Left */}
       <div className="relative z-10 flex min-h-screen flex-col justify-between p-6 sm:p-12 lg:p-16 max-w-4xl">
         
-        {/* Top-Left Section: Logo + Catchy Headline */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           
-          {/* Brand Header */}
-          <div className="inline-flex items-center gap-3.5 rounded-2xl bg-slate-900/80 border border-slate-700/60 px-4 py-2.5 backdrop-blur-md shadow-xl">
-            <img
-              src="/gemini-svg.svg"
-              alt="Zubair Traders Logo"
-              className="h-10 w-10 object-contain shrink-0"
-            />
+          {/* Prominent Logo & Brand Section */}
+          <div className="inline-flex items-center gap-4 rounded-2xl bg-slate-900/90 border border-amber-500/30 p-3.5 pr-6 backdrop-blur-md shadow-2xl">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 shadow-inner">
+              <img
+                src="/gemini-svg.svg"
+                alt="Zubair Traders Logo"
+                className="h-10 w-10 object-contain drop-shadow-[0_0_12px_rgba(245,158,11,0.4)]"
+              />
+            </div>
             <div>
-              <h2 className="text-base font-bold text-white tracking-wide leading-tight">
+              <h2 className="text-xl font-black text-white tracking-wide">
                 Zubair Traders
               </h2>
-              <p className="text-[11px] font-medium text-slate-300">
-                Wholesale & Ledger Management
+              <p className="text-xs font-semibold text-amber-400/90 uppercase tracking-wider">
+                Bakery Products & Wholesale
               </p>
             </div>
           </div>
 
-          {/* Catchy Lines */}
-          <div className="space-y-3 max-w-2xl">
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-tight drop-shadow-md">
-              Powering Modern Wholesale with Precision.
-            </h1>
-            <p className="text-sm sm:text-lg text-slate-200 font-normal leading-relaxed max-w-xl drop-shadow-sm">
-              Smart sales tracking, instant customer Khata ledgers, stock management, and custom invoices—built for performance.
-            </p>
+          {/* Dynamic Catchy Title & Subtitle */}
+          <div className="relative min-h-[180px] sm:min-h-[200px] flex flex-col justify-center">
+            {bakerySlides.map((slide, idx) => (
+              <div
+                key={slide.title}
+                className={`absolute left-0 top-0 w-full transition-all duration-700 ease-in-out ${
+                  idx === currentIndex
+                    ? 'opacity-100 translate-y-0 pointer-events-auto'
+                    : 'opacity-0 translate-y-4 pointer-events-none'
+                }`}
+              >
+                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-tight drop-shadow-md max-w-2xl">
+                  {slide.title}
+                </h1>
+                <p className="mt-4 text-sm sm:text-lg text-slate-200 font-normal leading-relaxed max-w-xl drop-shadow-xs">
+                  {slide.subtitle}
+                </p>
+              </div>
+            ))}
           </div>
 
-          {/* Single Action Button */}
-          <div className="pt-2">
+          {/* Get Started Button */}
+          <div>
             <button
               onClick={onGetStarted}
-              className="group inline-flex items-center gap-2.5 bg-slate-100 hover:bg-white text-slate-950 font-bold text-sm px-7 py-3.5 rounded-xl shadow-2xl transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+              className="group inline-flex items-center gap-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm px-8 py-4 rounded-xl shadow-xl shadow-amber-500/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
             >
               Get Started
-              <ArrowRight size={16} className="transition-transform group-hover:translate-x-1 text-slate-950" />
+              <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
             </button>
           </div>
 
         </div>
 
         {/* Footer info */}
-        <div className="text-xs text-slate-300 font-medium pt-8">
-          © Zubair Traders • Enterprise Operations
+        <div className="text-xs text-slate-400 font-medium pt-8">
+          © Zubair Traders • Bakery Management & Distribution
         </div>
 
       </div>
