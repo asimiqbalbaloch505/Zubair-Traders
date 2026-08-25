@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { FileText, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Banknote, Printer } from 'lucide-react';
+import { FileText, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Banknote } from 'lucide-react';
 import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
 import { supabase } from '../lib/supabase';
+import { InvoiceModal } from './invoiceModal';
 
 export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
   const sales = useGetSales();
@@ -436,7 +437,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                       <button
                         onClick={() => setSelectedRecord(tx)}
                         className="rounded-md p-2 text-muted-foreground hover:bg-muted"
-                        title="View Invoice"
+                        title="View Details"
                       >
                         <FileText size={15} />
                       </button>
@@ -514,10 +515,20 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         </Modal>
       )}
 
-      {/* Invoice Details Modal using core Modal component */}
-      {selectedRecord && (
+      {/* Render dedicated InvoiceModal for Sales Invoices */}
+      {selectedRecord && selectedRecord.type === 'INVOICE' && (
+        <InvoiceModal
+          sale={selectedRecord.raw}
+          onClose={() => setSelectedRecord(null)}
+          money={money}
+          timeDate={timeDate}
+        />
+      )}
+
+      {/* Render standard Modal for Direct Payment Receipts */}
+      {selectedRecord && selectedRecord.type === 'PAYMENT' && (
         <Modal
-          title={selectedRecord.type === 'INVOICE' ? `Invoice #${selectedRecord.refNo}` : `Payment Receipt`}
+          title="Payment Receipt"
           eyebrow={selectedRecord.buyerName}
           onClose={() => setSelectedRecord(null)}
         >
@@ -527,85 +538,23 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                 <p className="text-muted-foreground">Date & Time</p>
                 <p className="font-medium">{timeDate(selectedRecord.date)}</p>
               </div>
-              <div className="text-right">
-                <p className="text-muted-foreground">Status</p>
-                <span className="font-bold uppercase text-primary">{selectedRecord.status}</span>
-              </div>
             </div>
 
-            {/* If it's an Invoice with itemized lines */}
-            {selectedRecord.type === 'INVOICE' && (
-              <>
-                {selectedRecord.raw?.items && selectedRecord.raw.items.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="font-semibold text-muted-foreground">Line Items</p>
-                    <div className="border border-border rounded-lg overflow-hidden">
-                      <table className="w-full text-left">
-                        <thead className="bg-muted/50 border-b border-border text-[10px] uppercase">
-                          <tr>
-                            <th className="p-2">Item</th>
-                            <th className="p-2 text-center">Qty</th>
-                            <th className="p-2 text-right">Price</th>
-                            <th className="p-2 text-right">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {selectedRecord.raw.items.map((item: any, idx: number) => (
-                            <tr key={idx}>
-                              <td className="p-2 font-medium">{item.name || item.product_name || 'Product'}</td>
-                              <td className="p-2 text-center">{item.qty || item.quantity || 1}</td>
-                              <td className="p-2 text-right">{money(item.price || item.unit_price || 0)}</td>
-                              <td className="p-2 text-right font-mono font-semibold">
-                                {money((item.qty || item.quantity || 1) * (item.price || item.unit_price || 0))}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="rounded-lg bg-muted/40 p-3 space-y-1.5 font-mono">
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Total Invoice Amount:</span>
-                    <span className="font-bold text-foreground">{money(selectedRecord.amount)}</span>
-                  </div>
-                  <div className="flex justify-between text-emerald-700">
-                    <span>Amount Paid:</span>
-                    <span>{money(selectedRecord.paidAmount)}</span>
-                  </div>
-                  {selectedRecord.dueAmount > 0 && (
-                    <div className="flex justify-between text-destructive font-bold pt-1 border-t border-border/60">
-                      <span>Balance Due (Udhaar):</span>
-                      <span>{money(selectedRecord.dueAmount)}</span>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* If it's a Direct Udhaar Receipt */}
-            {selectedRecord.type === 'PAYMENT' && (
-              <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-emerald-800 font-medium">Payment Received:</span>
-                  <span className="font-mono text-lg font-bold text-emerald-800">
-                    {money(selectedRecord.amount)}
-                  </span>
-                </div>
-                {selectedRecord.raw?.notes && (
-                  <p className="text-muted-foreground italic border-t border-emerald-200/60 pt-2">
-                    Remarks: "{selectedRecord.raw.notes}"
-                  </p>
-                )}
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-emerald-800 font-medium">Payment Received:</span>
+                <span className="font-mono text-lg font-bold text-emerald-800">
+                  {money(selectedRecord.amount)}
+                </span>
               </div>
-            )}
+              {selectedRecord.raw?.notes && (
+                <p className="text-muted-foreground italic border-t border-emerald-200/60 pt-2">
+                  Remarks: "{selectedRecord.raw.notes}"
+                </p>
+              )}
+            </div>
 
             <div className="flex justify-end gap-2 pt-3">
-              <Button variant="outline" onClick={() => window.print()} className="gap-1.5">
-                <Printer size={14} /> Print
-              </Button>
               <Button onClick={() => setSelectedRecord(null)}>Close</Button>
             </div>
           </div>
