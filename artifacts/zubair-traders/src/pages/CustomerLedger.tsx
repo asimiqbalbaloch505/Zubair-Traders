@@ -1,18 +1,18 @@
 import React, { useState, useMemo } from 'react';
-import { FileText, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Banknote } from 'lucide-react';
+import { FileText, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Banknote, Printer } from 'lucide-react';
 import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
 import { supabase } from '../lib/supabase';
 
-export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate, InvoiceModal }: any) {
+export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
   const sales = useGetSales();
   const buyers = useGetBuyers();
   const payments = useGetBuyerPayments();
 
   const [selectedBuyerId, setSelectedBuyerId] = useState<string>('');
-  const [selectedRecord, setSelectedRecord] = useState<any>(null); // Stores either Invoice or Payment object
+  const [selectedRecord, setSelectedRecord] = useState<any>(null); // Stores selected transaction details
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Date Presets: 'today' | 'this_month' | 'last_month' | 'this_year' | 'last_year' | 'custom' | 'all'
+  // Date Presets
   const [datePreset, setDatePreset] = useState<string>('this_month');
   const [customDate, setCustomDate] = useState<string>('');
 
@@ -114,10 +114,9 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
       return itemDate.toISOString().split('T')[0] === customDate;
     }
 
-    return true; // 'all' or fallback
+    return true;
   };
 
-  // Filtered Raw Sales & Payments (used for Summary Cards & Table)
   const filteredSales = useMemo(() => {
     const rawSales = activeBuyer ? activeBuyer.invoices : (sales.data || []);
     return rawSales.filter((s: any) => isDateInFilterRange(s.created_at || s.transactionTime || s.transaction_time));
@@ -128,7 +127,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     return rawPayments.filter((p: any) => isDateInFilterRange(p.created_at || p.payment_date || p.transactionTime));
   }, [activeBuyer, payments.data, datePreset, customDate]);
 
-  // Dynamically Calculated Metrics based on Customer + Date Filter
   const summaryMetrics = useMemo(() => {
     const totalSales = filteredSales.reduce(
       (sum: number, s: any) => sum + Number(s.totalAmount ?? s.total_amount ?? 0),
@@ -151,7 +149,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     return { totalSales, totalCollected, totalUdhaar };
   }, [filteredSales, filteredPayments]);
 
-  // Combined Merged Transactions
   const transactionsList = useMemo(() => {
     const invs = filteredSales.map((inv: any) => {
       const total = Number(inv.totalAmount ?? inv.total_amount ?? 0);
@@ -208,7 +205,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     return merged;
   }, [filteredSales, filteredPayments, activeBuyer, searchQuery]);
 
-  // Open Receive Payment Modal
   const handleOpenReceivePayment = () => {
     if (!activeBuyer) return;
     setReceiveAmount(String(activeBuyer.totalUdhaar || ''));
@@ -216,7 +212,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     setIsPaymentModalOpen(true);
   };
 
-  // Submit Payment Received
   const handleReceivePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeBuyer || !receiveAmount || Number(receiveAmount) <= 0) return;
@@ -387,7 +382,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
             <table className="w-full min-w-[600px] text-left text-sm">
               <thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th className="pb-3">Invoice #</th>
+                  <th className="pb-3">Invoice / Ref #</th>
                   <th className="pb-3">Customer</th>
                   <th className="pb-3">Type</th>
                   <th className="pb-3">Date</th>
@@ -401,7 +396,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                 {transactionsList.map((tx: any) => (
                   <tr
                     key={`${tx.type}-${tx.id}`}
-                    onClick={() => setSelectedRecord(tx.raw)}
+                    onClick={() => setSelectedRecord(tx)}
                     className="transition cursor-pointer hover:bg-muted/40"
                   >
                     <td className="py-3 font-mono text-xs font-bold text-foreground">
@@ -439,8 +434,9 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                     </td>
                     <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => setSelectedRecord(tx.raw)}
+                        onClick={() => setSelectedRecord(tx)}
                         className="rounded-md p-2 text-muted-foreground hover:bg-muted"
+                        title="View Invoice"
                       >
                         <FileText size={15} />
                       </button>
@@ -518,14 +514,102 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         </Modal>
       )}
 
-      {/* Shared Component Invoice / Receipt View */}
-      {selectedRecord && InvoiceModal && (
-        <InvoiceModal
-          sale={selectedRecord}
+      {/* Invoice Details Modal using core Modal component */}
+      {selectedRecord && (
+        <Modal
+          title={selectedRecord.type === 'INVOICE' ? `Invoice #${selectedRecord.refNo}` : `Payment Receipt`}
+          eyebrow={selectedRecord.buyerName}
           onClose={() => setSelectedRecord(null)}
-          money={money}
-          timeDate={timeDate}
-        />
+        >
+          <div className="space-y-4 text-xs">
+            <div className="flex justify-between items-center pb-3 border-b border-border">
+              <div>
+                <p className="text-muted-foreground">Date & Time</p>
+                <p className="font-medium">{timeDate(selectedRecord.date)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-muted-foreground">Status</p>
+                <span className="font-bold uppercase text-primary">{selectedRecord.status}</span>
+              </div>
+            </div>
+
+            {/* If it's an Invoice with itemized lines */}
+            {selectedRecord.type === 'INVOICE' && (
+              <>
+                {selectedRecord.raw?.items && selectedRecord.raw.items.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="font-semibold text-muted-foreground">Line Items</p>
+                    <div className="border border-border rounded-lg overflow-hidden">
+                      <table className="w-full text-left">
+                        <thead className="bg-muted/50 border-b border-border text-[10px] uppercase">
+                          <tr>
+                            <th className="p-2">Item</th>
+                            <th className="p-2 text-center">Qty</th>
+                            <th className="p-2 text-right">Price</th>
+                            <th className="p-2 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {selectedRecord.raw.items.map((item: any, idx: number) => (
+                            <tr key={idx}>
+                              <td className="p-2 font-medium">{item.name || item.product_name || 'Product'}</td>
+                              <td className="p-2 text-center">{item.qty || item.quantity || 1}</td>
+                              <td className="p-2 text-right">{money(item.price || item.unit_price || 0)}</td>
+                              <td className="p-2 text-right font-mono font-semibold">
+                                {money((item.qty || item.quantity || 1) * (item.price || item.unit_price || 0))}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="rounded-lg bg-muted/40 p-3 space-y-1.5 font-mono">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Total Invoice Amount:</span>
+                    <span className="font-bold text-foreground">{money(selectedRecord.amount)}</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-700">
+                    <span>Amount Paid:</span>
+                    <span>{money(selectedRecord.paidAmount)}</span>
+                  </div>
+                  {selectedRecord.dueAmount > 0 && (
+                    <div className="flex justify-between text-destructive font-bold pt-1 border-t border-border/60">
+                      <span>Balance Due (Udhaar):</span>
+                      <span>{money(selectedRecord.dueAmount)}</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* If it's a Direct Udhaar Receipt */}
+            {selectedRecord.type === 'PAYMENT' && (
+              <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-emerald-800 font-medium">Payment Received:</span>
+                  <span className="font-mono text-lg font-bold text-emerald-800">
+                    {money(selectedRecord.amount)}
+                  </span>
+                </div>
+                {selectedRecord.raw?.notes && (
+                  <p className="text-muted-foreground italic border-t border-emerald-200/60 pt-2">
+                    Remarks: "{selectedRecord.raw.notes}"
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-3">
+              <Button variant="outline" onClick={() => window.print()} className="gap-1.5">
+                <Printer size={14} /> Print
+              </Button>
+              <Button onClick={() => setSelectedRecord(null)}>Close</Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
