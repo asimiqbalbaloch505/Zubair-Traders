@@ -263,25 +263,27 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
       <PageIntro eyebrow="Fast lane" title="Make a sale" detail="A clean invoice now means a clean drawer later." />
 
       <div className="flex flex-col gap-5">
-        <section className="panel rounded-xl p-5">
-          <div className="mb-5 flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-primary">
+        {/* SALE FORM SECTION - Enhanced Mobile UI */}
+        <section className="panel rounded-xl p-3.5 sm:p-5">
+          <div className="mb-4 sm:mb-5 flex items-center gap-3">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-secondary text-primary">
               <ShoppingCart size={18} />
             </div>
             <div>
-              <h3 className="font-bold">Record New Sale</h3>
+              <h3 className="font-bold text-base sm:text-lg">Record New Sale</h3>
               <p className="text-xs text-muted-foreground">Select customer and add line items</p>
             </div>
           </div>
 
           <form onSubmit={handleOpenConfirmation} className="grid gap-4">
+            {/* Customer Dropdown with Add Button */}
             <div className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span>Customer</span>
                 <button
                   type="button"
                   onClick={openCustomerModal}
-                  className="flex items-center gap-1 text-xs text-primary font-bold hover:underline cursor-pointer"
+                  className="flex items-center gap-1 text-xs text-primary font-bold hover:underline cursor-pointer shrink-0"
                 >
                   <UserPlus size={14} /> + New Customer
                 </button>
@@ -291,7 +293,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                 required
                 value={buyerId}
                 onChange={e => setBuyerId(e.target.value)}
-                className="h-10 rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary"
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary truncate"
               >
                 <option value="">Choose a Customer…</option>
                 {buyers.data?.map((b: any) => (
@@ -302,13 +304,16 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               </select>
             </div>
 
+            {/* Product Picker Box */}
             <div className="rounded-lg border bg-muted/30 p-3">
               <div className="mb-2 text-xs font-semibold text-muted-foreground">Add Products to Sale</div>
-              <div className="flex flex-col gap-2 sm:flex-row">
+              
+              {/* Stacked layout on mobile, inline on desktop */}
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
                 <select
                   value={selectedProductId}
                   onChange={e => handleProductSelect(e.target.value)}
-                  className="h-10 flex-1 rounded-lg border border-input bg-background px-3 text-sm font-medium outline-none focus:border-primary"
+                  className="h-10 w-full sm:flex-1 rounded-lg border border-input bg-background px-3 text-sm font-medium outline-none focus:border-primary truncate"
                 >
                   <option value="">Select product...</option>
                   {products.data?.map((p: any) => {
@@ -323,50 +328,65 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                     );
                   })}
                 </select>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    value={itemQty}
-                    onChange={e => setItemQty(e.target.value)}
-                    placeholder="Qty"
-                    title="Quantity"
-                    className="h-10 w-20 rounded-lg border border-input bg-background px-2 text-center text-sm outline-none focus:border-primary"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={itemUnitPrice}
-                    onChange={e => setItemUnitPrice(e.target.value)}
-                    placeholder="Unit Price"
-                    title="Custom Unit Price"
-                    className="h-10 w-28 rounded-lg border border-input bg-background px-2 text-center text-sm outline-none focus:border-primary"
-                  />
-                  <Button testId="button-add-item" type="button" onClick={addItem} disabled={!selectedProductId}>
-                    <Plus size={16} /> Add
-                  </Button>
+
+                {/* Mobile: Full-width Qty/Price/Add Row */}
+                <div className="grid grid-cols-12 gap-2 w-full sm:w-auto">
+                  <div className="col-span-3 sm:w-20">
+                    <input
+                      type="number"
+                      min="1"
+                      value={itemQty}
+                      onChange={e => setItemQty(e.target.value)}
+                      placeholder="Qty"
+                      title="Quantity"
+                      className="h-10 w-full rounded-lg border border-input bg-background px-2 text-center text-sm outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div className="col-span-5 sm:w-28">
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={itemUnitPrice}
+                      onChange={e => setItemUnitPrice(e.target.value)}
+                      placeholder="Unit Price"
+                      title="Custom Unit Price"
+                      className="h-10 w-full rounded-lg border border-input bg-background px-2 text-center text-sm outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div className="col-span-4 sm:w-auto">
+                    <Button 
+                      testId="button-add-item" 
+                      type="button" 
+                      onClick={addItem} 
+                      disabled={!selectedProductId}
+                      className="h-10 w-full sm:w-auto shrink-0 px-3 flex items-center justify-center gap-1"
+                    >
+                      <Plus size={16} /> <span>Add</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
 
+              {/* Added Cart Items List */}
               {items.length > 0 && (
                 <div className="mt-3 divide-y border-t pt-2">
                   {items.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between py-1.5 text-xs">
-                      <div>
-                        <span className="font-semibold">{item.productName}</span>
-                        <span className="ml-2 text-muted-foreground">
+                    <div key={idx} className="flex items-center justify-between py-2 text-xs gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold truncate">{item.productName}</p>
+                        <p className="text-muted-foreground text-[11px]">
                           x{item.quantity} @ {money(item.unitPrice)}
-                        </span>
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className="font-mono font-bold">{money(item.totalPrice)}</span>
                         <button
                           type="button"
                           onClick={() => removeItem(idx)}
-                          className="text-destructive hover:opacity-80"
+                          className="text-destructive hover:opacity-80 p-1"
                         >
-                          <X size={14} />
+                          <X size={15} />
                         </button>
                       </div>
                     </div>
@@ -375,7 +395,8 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3 items-start">
+            {/* Total and Paid Amount Fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
               <Field
                 label="Sale total"
                 name="sale-total"
@@ -403,10 +424,11 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               placeholder="Delivery route, order detail…"
             />
 
+            {/* Balance Due Counter Box */}
             <div className="rounded-lg bg-muted p-3">
-              <div className="flex justify-between text-xs text-muted-foreground">
+              <div className="flex justify-between items-center text-xs text-muted-foreground">
                 <span>Udhar on this invoice</span>
-                <span className="font-mono font-bold text-foreground">{money(due)}</span>
+                <span className="font-mono font-bold text-foreground text-sm">{money(due)}</span>
               </div>
             </div>
 
@@ -414,35 +436,36 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               type="submit"
               disabled={create.isPending || !buyerId || items.length === 0}
               testId="button-create-sale"
-              className="h-11"
+              className="h-11 w-full flex items-center justify-center gap-2 font-semibold"
             >
               <Check size={17} /> Confirm sale
             </Button>
 
             {errorMessage && (
               <div className="flex items-center gap-2 rounded bg-destructive/10 p-2.5 text-xs font-semibold text-destructive">
-                <AlertCircle size={15} />
+                <AlertCircle size={15} className="shrink-0" />
                 <span>{errorMessage}</span>
               </div>
             )}
           </form>
         </section>
 
-        <section className="panel rounded-xl p-5">
+        {/* UNCHANGED INVOICES TABLE SECTION */}
+        <section className="panel rounded-xl p-3.5 sm:p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-bold">Recent invoices</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Click any invoice to view full details</p>
+              <h3 className="font-bold text-base sm:text-lg">Recent invoices</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">Click any invoice to view full details</p>
             </div>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
+          <div className="mt-4 sm:mt-5 overflow-x-auto -mx-3.5 sm:mx-0 px-3.5 sm:px-0">
             {sales.isLoading ? (
               <Loading />
             ) : sales.isError ? (
               <Failed onRetry={() => sales.refetch()} />
             ) : recentSales.length ? (
-              <table className="w-full min-w-[550px] text-left text-sm">
+              <table className="w-full min-w-[500px] text-left text-sm">
                 <thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
                   <tr>
                     <th className="pb-3">Invoice #</th>
@@ -469,8 +492,10 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                       >
                         <td className="py-3 font-mono text-xs font-bold">{cleanNum}</td>
                         <td className="py-3 font-semibold">
-                          {s.buyerName || s.buyer_name || 'Walk-in Customer'}
-                          <div className="text-[10px] text-muted-foreground">
+                          <div className="max-w-[140px] sm:max-w-none truncate">
+                            {s.buyerName || s.buyer_name || 'Walk-in Customer'}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground font-normal">
                             {timeDate(s.created_at || s.transactionTime)}
                           </div>
                         </td>
@@ -481,7 +506,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                         <td className="py-3">
                           <span
                             data-testid={`status-sale-${s.id}`}
-                            className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${
+                            className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
                               String(status).toLowerCase() === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-secondary text-primary'
                             }`}
                           >
@@ -493,7 +518,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                             <button
                               title="View detail"
                               onClick={() => setSelectedInvoice(s)}
-                              className="rounded-md p-2 text-muted-foreground hover:bg-muted"
+                              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
                             >
                               <FileText size={15} />
                             </button>
@@ -519,69 +544,69 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           onClose={() => setIsConfirming(false)}
         >
           <div className="space-y-4">
-            <div className="printable-invoice relative p-6 bg-white text-black rounded-lg border border-border overflow-hidden">
-              <div className="relative flex justify-between items-start border-b border-black/20 pb-4 mb-4">
+            <div className="printable-invoice relative p-3.5 sm:p-6 bg-white text-black rounded-lg border border-border overflow-hidden">
+              <div className="relative flex flex-col sm:flex-row justify-between items-start border-b border-black/20 pb-3 sm:pb-4 mb-3 sm:mb-4 gap-2">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Building2 size={24} className="text-black" />
-                    <h1 className="text-xl font-bold uppercase tracking-wider text-black">
+                    <Building2 size={20} className="text-black shrink-0" />
+                    <h1 className="text-base sm:text-xl font-bold uppercase tracking-wider text-black">
                       Zubair Traders
                     </h1>
                   </div>
-                  <p className="text-xs text-gray-600 mt-1 font-medium">
+                  <p className="text-[11px] sm:text-xs text-gray-600 mt-0.5 font-medium">
                     Bakery & General Traders Management
                   </p>
                 </div>
-                <div className="text-right">
-                  <span className="inline-block px-3 py-1 bg-black text-white text-xs font-bold uppercase rounded">
+                <div className="self-start sm:self-auto">
+                  <span className="inline-block px-2.5 py-0.5 bg-black text-white text-[10px] sm:text-xs font-bold uppercase rounded">
                     Draft Invoice
                   </span>
                 </div>
               </div>
 
-              <div className="relative grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded border border-gray-200 text-xs mb-4">
+              <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-2.5 sm:p-3 rounded border border-gray-200 text-xs mb-3 sm:mb-4">
                 <div>
                   <p className="text-gray-500 uppercase text-[10px] font-bold">Customer Name</p>
-                  <p className="font-bold text-black text-sm">
+                  <p className="font-bold text-black text-xs sm:text-sm">
                     {selectedBuyerObj?.name || 'Walk-in Customer'}
                   </p>
                   {selectedBuyerObj?.phone && (
                     <p className="text-gray-600 text-[11px]">{selectedBuyerObj.phone}</p>
                   )}
                 </div>
-                <div className="text-right">
+                <div className="sm:text-right">
                   <p className="text-gray-500 uppercase text-[10px] font-bold">Transaction Date</p>
-                  <p className="font-semibold text-black">
+                  <p className="font-semibold text-black text-[11px] sm:text-xs">
                     {new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' })}
                   </p>
                 </div>
               </div>
 
-              <div className="border border-gray-200 rounded overflow-hidden mb-4">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-100 border-b border-gray-200 text-black font-bold uppercase text-[10px]">
+              <div className="border border-gray-200 rounded overflow-x-auto mb-3 sm:mb-4">
+                <table className="w-full text-left text-xs min-w-[300px]">
+                  <thead className="bg-gray-100 border-b border-gray-200 text-black font-bold uppercase text-[9px] sm:text-[10px]">
                     <tr>
-                      <th className="p-2">Item Description</th>
-                      <th className="p-2 text-center">Qty</th>
-                      <th className="p-2 text-right">Unit Price</th>
-                      <th className="p-2 text-right">Total</th>
+                      <th className="p-1.5 sm:p-2">Item</th>
+                      <th className="p-1.5 sm:p-2 text-center">Qty</th>
+                      <th className="p-1.5 sm:p-2 text-right">Price</th>
+                      <th className="p-1.5 sm:p-2 text-right">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-gray-200 text-[11px] sm:text-xs">
                     {items.map((item, idx) => (
                       <tr key={idx}>
-                        <td className="p-2 font-medium text-black">{item.productName}</td>
-                        <td className="p-2 text-center">{item.quantity}</td>
-                        <td className="p-2 text-right">{money(item.unitPrice)}</td>
-                        <td className="p-2 text-right font-mono font-bold">{money(item.totalPrice)}</td>
+                        <td className="p-1.5 sm:p-2 font-medium text-black max-w-[120px] truncate">{item.productName}</td>
+                        <td className="p-1.5 sm:p-2 text-center">{item.quantity}</td>
+                        <td className="p-1.5 sm:p-2 text-right">{money(item.unitPrice)}</td>
+                        <td className="p-1.5 sm:p-2 text-right font-mono font-bold">{money(item.totalPrice)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              <div className="relative flex justify-end mb-4">
-                <div className="w-64 space-y-1.5 bg-gray-50 border border-gray-200 p-3 rounded text-xs">
+              <div className="relative flex justify-end mb-3 sm:mb-4">
+                <div className="w-full sm:w-64 space-y-1.5 bg-gray-50 border border-gray-200 p-2.5 sm:p-3 rounded text-xs">
                   <div className="flex justify-between text-gray-700">
                     <span>Total Amount:</span>
                     <span className="font-mono font-bold text-black">{money(totalAmount)}</span>
@@ -604,13 +629,12 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               )}
             </div>
 
-            {/* Action controls inside the Confirmation Popup */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-2">
               <Button
                 variant="outline"
                 type="button"
                 onClick={() => setIsConfirming(false)}
-                className="flex items-center gap-1.5"
+                className="flex items-center justify-center gap-1.5 h-10"
               >
                 <Edit3 size={15} /> Edit Invoice
               </Button>
@@ -618,7 +642,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
                 type="button"
                 onClick={handleFinalSubmit}
                 disabled={create.isPending}
-                className="flex items-center gap-1.5 bg-emerald-800 hover:bg-emerald-900 text-white"
+                className="flex items-center justify-center gap-1.5 h-10 bg-emerald-800 hover:bg-emerald-900 text-white"
               >
                 {create.isPending ? 'Saving Invoice...' : <><Check size={16} /> Confirm & Save Invoice</>}
               </Button>
@@ -634,11 +658,11 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           eyebrow="System Notification"
           onClose={() => setIsSuccessModalOpen(false)}
         >
-          <div className="flex flex-col items-center justify-center p-6 text-center space-y-4">
+          <div className="flex flex-col items-center justify-center p-4 sm:p-6 text-center space-y-4">
             <div className="rounded-full bg-emerald-100 p-3 text-emerald-700">
-              <CheckCircle2 size={48} />
+              <CheckCircle2 size={40} />
             </div>
-            <h3 className="text-lg font-bold text-foreground">
+            <h3 className="text-base sm:text-lg font-bold text-foreground">
               Record saved successfully
             </h3>
             <p className="text-xs text-muted-foreground">
@@ -648,7 +672,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               <Button
                 type="button"
                 onClick={() => setIsSuccessModalOpen(false)}
-                className="w-full bg-emerald-800 hover:bg-emerald-900 text-white"
+                className="w-full h-10 bg-emerald-800 hover:bg-emerald-900 text-white"
               >
                 Done
               </Button>
@@ -664,7 +688,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           eyebrow="CUSTOMER BOOK"
           onClose={() => setIsCustomerModalOpen(false)}
         >
-          <form onSubmit={handleCreateCustomer} className="grid gap-4 pt-2">
+          <form onSubmit={handleCreateCustomer} className="grid gap-3 sm:gap-4 pt-2">
             <Field
               label="Name"
               name="new-customer-name"
@@ -673,7 +697,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
               required
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field
                 label="Phone"
                 name="new-customer-phone"
@@ -699,7 +723,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
 
             {customerModalError && (
               <div className="flex items-center gap-2 rounded bg-destructive/10 p-2.5 text-xs font-semibold text-destructive">
-                <AlertCircle size={15} />
+                <AlertCircle size={15} className="shrink-0" />
                 <span>{customerModalError}</span>
               </div>
             )}
