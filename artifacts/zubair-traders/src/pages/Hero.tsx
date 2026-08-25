@@ -36,7 +36,7 @@ export function Hero({ onGetStarted }: HeroProps) {
   return (
     <div className="relative min-h-screen w-full font-sans select-none overflow-hidden flex flex-col justify-between">
       
-      {/* BACKGROUND IMAGES WITH DARKER SHADE TINT */}
+      {/* HIGH VISIBILITY BACKGROUND IMAGES WITH LIGHT SHADE */}
       <div className="absolute inset-0 pointer-events-none z-0">
         {snackSlides.map((slide, idx) => (
           <div
@@ -48,13 +48,12 @@ export function Hero({ onGetStarted }: HeroProps) {
           />
         ))}
 
-        {/* Darker Overlay specifically to tone down image brightness */}
-        <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-white via-white/70 to-white/90" />
+        {/* Minimal Dark Shade Tint to preserve full photo visibility */}
+        <div className="absolute inset-0 bg-black/30" />
       </div>
 
       {/* TOP HEADER */}
-      <header className="relative z-10 w-full px-6 py-5 border-b border-slate-200/50 bg-white/60 backdrop-blur-md">
+      <header className="relative z-10 w-full px-6 py-5 border-b border-white/20 bg-white/85 backdrop-blur-md shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img
@@ -81,36 +80,40 @@ export function Hero({ onGetStarted }: HeroProps) {
         </div>
       </header>
 
-      {/* MAIN CENTER CONTENT */}
-      <main className="relative z-10 max-w-4xl mx-auto px-6 py-12 flex-1 flex flex-col items-center justify-center text-center">
+      {/* MAIN CENTER CONTENT WITH GLASS CARD FOR OPTIMAL LEGIBILITY */}
+      <main className="relative z-10 max-w-3xl mx-auto px-6 py-12 flex-1 flex flex-col items-center justify-center text-center">
         
-        {/* Dynamic Title */}
-        <div className="min-h-[100px] sm:min-h-[120px] flex items-center justify-center">
-          <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-950 tracking-tight leading-tight max-w-3xl transition-all duration-500 drop-shadow-sm">
-            {snackSlides[currentIndex].title}
-          </h2>
-        </div>
+        <div className="bg-white/75 backdrop-blur-md p-8 sm:p-12 rounded-3xl border border-white/40 shadow-2xl flex flex-col items-center">
+          
+          {/* Dynamic Title */}
+          <div className="min-h-[90px] sm:min-h-[110px] flex items-center justify-center">
+            <h2 className="text-3xl sm:text-5xl font-black text-slate-950 tracking-tight leading-tight transition-all duration-500">
+              {snackSlides[currentIndex].title}
+            </h2>
+          </div>
 
-        {/* Dynamic Subtitle */}
-        <p className="mt-4 text-sm sm:text-lg text-slate-900 max-w-xl font-semibold leading-relaxed min-h-[60px] drop-shadow-xs">
-          {snackSlides[currentIndex].subtitle}
-        </p>
+          {/* Dynamic Subtitle */}
+          <p className="mt-4 text-sm sm:text-base text-slate-700 font-semibold leading-relaxed max-w-lg min-h-[50px]">
+            {snackSlides[currentIndex].subtitle}
+          </p>
 
-        {/* Centered Action Button */}
-        <div className="mt-8">
-          <button
-            onClick={onGetStarted}
-            className="group inline-flex items-center gap-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm px-9 py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform active:scale-95"
-          >
-            Get Started
-            <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
-          </button>
+          {/* Action Button */}
+          <div className="mt-6">
+            <button
+              onClick={onGetStarted}
+              className="group inline-flex items-center gap-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm px-9 py-4 rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95"
+            >
+              Get Started
+              <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+            </button>
+          </div>
+
         </div>
 
       </main>
 
       {/* FOOTER */}
-      <footer className="relative z-10 w-full py-4 bg-white/60 border-t border-slate-200/50 backdrop-blur-md text-center text-xs text-slate-900 font-semibold">
+      <footer className="relative z-10 w-full py-4 bg-white/85 border-t border-white/20 backdrop-blur-md text-center text-xs text-slate-900 font-semibold shadow-sm">
         © Zubair Traders • Snacks Wholesale & Distribution System
       </footer>
 
