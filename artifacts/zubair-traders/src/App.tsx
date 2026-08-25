@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { 
   ShoppingCart, Users, Package, Truck, Wallet, 
@@ -115,14 +116,14 @@ function Field({ label, name, type = 'text', value, onChange, required, placehol
     </label>
   );
 }
-
 function Modal({ title, eyebrow, onClose, children }: any) {
-  return (
+  // 2. Wrap the JSX in createPortal
+  return createPortal(
     <div 
       role="dialog" 
       className="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in"
     >
-      <div className="w-full max-w-lg rounded-xl border bg-background p-6 shadow-2xl">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border bg-background p-6 shadow-2xl">
         <div className="mb-4 flex items-start justify-between border-b pb-3">
           <div>
             {eyebrow && <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{eyebrow}</div>}
@@ -134,7 +135,8 @@ function Modal({ title, eyebrow, onClose, children }: any) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body // 3. Teleport directly to body
   );
 }
 
