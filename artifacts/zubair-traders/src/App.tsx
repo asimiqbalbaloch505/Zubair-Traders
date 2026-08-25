@@ -118,7 +118,10 @@ function Field({ label, name, type = 'text', value, onChange, required, placehol
 
 function Modal({ title, eyebrow, onClose, children }: any) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in">
+    <div 
+      role="dialog" 
+      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in"
+    >
       <div className="w-full max-w-lg rounded-xl border bg-background p-6 shadow-2xl">
         <div className="mb-4 flex items-start justify-between border-b pb-3">
           <div>
