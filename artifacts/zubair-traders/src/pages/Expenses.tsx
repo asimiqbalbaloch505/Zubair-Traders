@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useGetExpenses, useCreateExpense } from '../hooks/useSupabaseData';
 import { Plus, Search, Calendar, Filter, DollarSign, Tag, FileText } from 'lucide-react';
 
-export function ExpensesView() {
+export function Expenses() {
   const { data: rawExpenses = [], isLoading, error } = useGetExpenses();
   const createExpenseMutation = useCreateExpense();
 
