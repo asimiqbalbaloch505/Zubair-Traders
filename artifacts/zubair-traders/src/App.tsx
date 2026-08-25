@@ -118,9 +118,9 @@ function Field({ label, name, type = 'text', value, onChange, required, placehol
 
 function Modal({ title, eyebrow, onClose, children }: any) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in overflow-y-auto print:p-0 print:bg-transparent print:static print:block">
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border bg-background p-6 shadow-2xl print:max-w-none print:max-h-none print:border-none print:shadow-none print:p-0">
-        <div className="mb-4 flex items-start justify-between border-b pb-3 print:hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in">
+      <div className="w-full max-w-lg rounded-xl border bg-background p-6 shadow-2xl">
+        <div className="mb-4 flex items-start justify-between border-b pb-3">
           <div>
             {eyebrow && <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{eyebrow}</div>}
             <h2 className="text-lg font-bold">{title}</h2>
@@ -231,22 +231,7 @@ function MainApp() {
 
   // Render Main Application
   return (
-    <div className="min-h-screen bg-background <style>{`
-  @media print {
-    /* Hide top header, navigation, and main page content when printing */
-    header, nav, main > *:not(.print-active) {
-      display: none !important;
-    }
-    body {
-      background: #ffffff !important;
-      color: #000000 !important;
-    }
-    @page {
-      size: A4 portrait;
-      margin: 10mm;
-    }
-  }
-`}</style>font-sans text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
+    <div className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
       <header className="sticky top-0 z-40 border-b border-border/80 bg-background/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
