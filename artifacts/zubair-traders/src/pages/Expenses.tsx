@@ -1,263 +1,300 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Filter, Calendar } from 'lucide-react';
-import { 
-  useGetExpenses, 
-  getGetExpensesQueryKey, 
-  useCreateExpense 
-} from '../hooks/useSupabaseData';
-import { useQueryClient } from '@tanstack/react-query';
+import { useGetExpenses, useCreateExpense } from '../hooks/useSupabaseData';
+import { Plus, Search, Calendar, Filter, DollarSign, Tag, FileText } from 'lucide-react';
 
-export function Expenses({ PageIntro, Button, Field, Modal, Loading, Failed, Empty, money, timeDate }: any) {
-  const q = useGetExpenses({ query: { queryKey: getGetExpensesQueryKey() } });
-  const create = useCreateExpense();
-  const qc = useQueryClient();
+export function ExpensesView() {
+  const { data: rawExpenses = [], isLoading, error } = useGetExpenses();
+  const createExpenseMutation = useCreateExpense();
 
-  const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({
-    title: '',
-    amount: '',
-    category: 'Utilities',
-    notes: ''
-  });
+  // 1. Controls State with Defaults
+  const todayStr = new Date().toISOString().split('T')[0];
+  const currentMonthStr = new Date().toISOString().slice(0, 7); // "YYYY-MM"
 
-  // Filter States: 'this_month' | 'all' | 'month' | 'date'
-  const [filterType, setFilterType] = useState<'this_month' | 'all' | 'month' | 'date'>('this_month');
-  
-  // Default selected month to current month index (0-11)
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
-  // Default selected date to today (YYYY-MM-DD)
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [filterMode, setFilterMode] = useState<'all' | 'today' | 'this_month' | 'custom_month' | 'custom_date'>('this_month');
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const categories = ['Utilities', 'Rent', 'Salaries', 'Maintenance', 'Fuel', 'Supplies', 'Misc'];
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June', 
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
+  // Form State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [category, setCategory] = useState('');
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [expenseDate, setExpenseDate] = useState(todayStr);
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    create.mutate(
-      {
-        data: {
-          ...form,
-          amount: Number(form.amount)
-        }
-      },
-      {
-        onSuccess: () => {
-          qc.invalidateQueries({ queryKey: getGetExpensesQueryKey() });
-          setModal(false);
-          setForm({ title: '', amount: '', category: 'Utilities', notes: '' });
-        }
-      }
-    );
-  };
-
-  // Filtered expenses based on selection
+  // 2. Filter Logic with Safe Fallbacks
   const filteredExpenses = useMemo(() => {
-    if (!q.data) return [];
+    return rawExpenses.filter((exp: any) => {
+      // Safe Date Extraction
+      const rawDateStr = exp.expenseDate || exp.expense_date || exp.created_at;
+      const dateObj = rawDateStr ? new Date(rawDateStr) : new Date();
+      
+      // Text Search
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        (exp.category || '').toLowerCase().includes(query) ||
+        (exp.description || exp.notes || '').toLowerCase().includes(query) ||
+        (exp.amount || '').toString().includes(query);
 
-    const now = new Date();
-    const currentYear = now.getFullYear();
+      if (!matchesSearch) return false;
 
-    return q.data.filter((item: any) => {
-      const itemDate = new Date(item.created_at || item.createdAt);
-      if (isNaN(itemDate.getTime())) return false;
+      // Filter Mode Checks
+      if (filterMode === 'all') return true;
 
-      if (filterType === 'all') {
-        return true;
+      if (filterMode === 'today') {
+        const todayObj = new Date();
+        return (
+          dateObj.getDate() === todayObj.getDate() &&
+          dateObj.getMonth() === todayObj.getMonth() &&
+          dateObj.getFullYear() === todayObj.getFullYear()
+        );
       }
 
-      if (filterType === 'this_month') {
-        // From 1st of current month up to current date/year
-        return itemDate.getFullYear() === currentYear && itemDate.getMonth() === now.getMonth();
+      if (filterMode === 'this_month') {
+        const todayObj = new Date();
+        return (
+          dateObj.getMonth() === todayObj.getMonth() &&
+          dateObj.getFullYear() === todayObj.getFullYear()
+        );
       }
 
-      if (filterType === 'month') {
-        // Selected month of current year
-        return itemDate.getFullYear() === currentYear && itemDate.getMonth() === Number(selectedMonth);
+      if (filterMode === 'custom_month' && selectedMonth) {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        return dateObj.getFullYear() === year && dateObj.getMonth() + 1 === month;
       }
 
-      if (filterType === 'date') {
-        // Specific exact date (YYYY-MM-DD)
-        const itemDateStr = itemDate.toISOString().split('T')[0];
-        return itemDateStr === selectedDate;
+      if (filterMode === 'custom_date' && selectedDate) {
+        const [year, month, day] = selectedDate.split('-').map(Number);
+        return (
+          dateObj.getFullYear() === year &&
+          dateObj.getMonth() + 1 === month &&
+          dateObj.getDate() === day
+        );
       }
 
       return true;
     });
-  }, [q.data, filterType, selectedMonth, selectedDate]);
+  }, [rawExpenses, filterMode, selectedMonth, selectedDate, searchQuery]);
 
-  // Recalculate total expense dynamically based on filtered data
-  const totalExpense = useMemo(() => {
-    return filteredExpenses.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
+  // Calculations
+  const totalExpenseAmount = useMemo(() => {
+    return filteredExpenses.reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0);
   }, [filteredExpenses]);
 
+  // Form Submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!category || !amount) return;
+
+    try {
+      await createExpenseMutation.mutateAsync({
+        data: {
+          category,
+          amount: parseFloat(amount),
+          description,
+          expenseDate: new Date(expenseDate).toISOString(),
+        },
+      });
+      setIsModalOpen(false);
+      setCategory('');
+      setAmount('');
+      setDescription('');
+      setExpenseDate(todayStr);
+    } catch (err: any) {
+      alert(`Failed to add expense: ${err.message}`);
+    }
+  };
+
   return (
-    <div className="animate-in">
-      <PageIntro 
-        eyebrow="Floor overhead & operational costs" 
-        title="Expenses" 
-        detail="Log everyday bakery costs to keep daily net profit accurate." 
-        action={
-          <Button onClick={() => setModal(true)} testId="button-add-expense">
-            <Plus size={16} /> Log expense
-          </Button>
-        } 
-      />
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Header Bar */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Expenses Tracker</h1>
+          <p className="text-sm text-gray-500">Monitor and log business operational operational costs</p>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition"
+        >
+          <Plus className="w-5 h-5 mr-2" /> Record Expense
+        </button>
+      </div>
 
-      {/* FILTER CONTROL BAR */}
-      <div className="panel mb-5 rounded-xl p-3.5 sm:p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase text-muted-foreground">
-            <Filter size={15} className="text-primary" />
-            <span>Filter Expenses</span>
-          </div>
+      {/* Side-by-Side Control Bar */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
+        {/* Search */}
+        <div className="relative">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+          <input
+            type="text"
+            placeholder="Search expense or note..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          />
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={filterType}
-              onChange={(e: any) => setFilterType(e.target.value)}
-              className="h-9 rounded-lg border border-input bg-background px-3 text-xs font-semibold text-foreground outline-none focus:border-primary cursor-pointer"
-            >
-              <option value="this_month">This Month</option>
-              <option value="all">All Time</option>
-              <option value="month">Select Month</option>
-              <option value="date">Select Date</option>
-            </select>
+        {/* Filter Mode Dropdown */}
+        <div className="relative">
+          <Filter className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+          <select
+            value={filterMode}
+            onChange={(e: any) => setFilterMode(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          >
+            <option value="all">All Time</option>
+            <option value="today">Today</option>
+            <option value="this_month">This Month</option>
+            <option value="custom_month">Specific Month</option>
+            <option value="custom_date">Specific Date</option>
+          </select>
+        </div>
 
-            {/* Sub-filter dropdown for Month Selection */}
-            {filterType === 'month' && (
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                className="h-9 rounded-lg border border-input bg-background px-3 text-xs font-semibold text-foreground outline-none focus:border-primary cursor-pointer"
-              >
-                {months.map((m, idx) => (
-                  <option key={m} value={idx}>
-                    {m} ({new Date().getFullYear()})
-                  </option>
-                ))}
-              </select>
-            )}
+        {/* Month Selector (Always Visible) */}
+        <div>
+          <input
+            type="month"
+            value={selectedMonth}
+            disabled={filterMode !== 'custom_month'}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none ${
+              filterMode !== 'custom_month' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white'
+            }`}
+          />
+        </div>
 
-            {/* Sub-filter input for Specific Date Selection */}
-            {filterType === 'date' && (
-              <div className="relative flex items-center">
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="h-9 rounded-lg border border-input bg-background px-3 text-xs font-semibold text-foreground outline-none focus:border-primary"
-                />
-              </div>
-            )}
-          </div>
+        {/* Date Picker (Always Visible) */}
+        <div>
+          <input
+            type="date"
+            value={selectedDate}
+            disabled={filterMode !== 'custom_date'}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none ${
+              filterMode !== 'custom_date' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white'
+            }`}
+          />
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="panel rounded-xl p-4">
-          <div className="text-xs font-bold uppercase text-muted-foreground">Total logged expenses</div>
-          <div className="mt-2 font-mono text-2xl font-bold text-destructive">{money(totalExpense)}</div>
-        </div>
-        <div className="panel rounded-xl p-4">
-          <div className="text-xs font-bold uppercase text-muted-foreground">Recorded entries</div>
-          <div className="mt-2 font-mono text-2xl font-bold">{filteredExpenses.length}</div>
-        </div>
+      {/* Summary Card */}
+      <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center justify-between">
+        <span className="text-sm font-medium text-indigo-900">Total Filtered Expenses</span>
+        <span className="text-xl font-bold text-indigo-700">PKR {totalExpenseAmount.toLocaleString()}</span>
       </div>
 
-      <div className="panel mt-5 overflow-x-auto rounded-xl p-5">
-        {q.isLoading ? (
-          <Loading />
-        ) : q.isError ? (
-          <Failed onRetry={() => q.refetch()} />
-        ) : filteredExpenses.length ? (
-          <table className="w-full min-w-[650px] text-left text-sm">
-            <thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
+      {/* Expenses Data Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {isLoading ? (
+          <div className="p-8 text-center text-gray-500">Loading expenses...</div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-500">Error fetching expenses data.</div>
+        ) : filteredExpenses.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">No expense records match your filter.</div>
+        ) : (
+          <table className="w-full text-left text-sm text-gray-600">
+            <thead className="bg-gray-50 text-gray-700 font-semibold border-b border-gray-200">
               <tr>
-                <th className="pb-3">Title & Category</th>
-                <th className="pb-3">Note</th>
-                <th className="pb-3">Logged time</th>
-                <th className="pb-3 text-right">Amount</th>
+                <th className="px-6 py-3">Date</th>
+                <th className="px-6 py-3">Category</th>
+                <th className="px-6 py-3">Description / Note</th>
+                <th className="px-6 py-3 text-right">Amount (PKR)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/70">
-              {filteredExpenses.map((exp: any) => (
-                <tr key={exp.id} data-testid={`row-expense-${exp.id}`}>
-                  <td className="py-3">
-                    <div className="font-semibold">{exp.title}</div>
-                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      {exp.category}
-                    </span>
-                  </td>
-                  <td className="py-3 text-xs text-muted-foreground">{exp.notes || '—'}</td>
-                  <td className="py-3 font-mono text-xs text-muted-foreground">{timeDate(exp.created_at || exp.createdAt)}</td>
-                  <td className="py-3 text-right font-mono font-bold text-destructive">
-                    {money(exp.amount)}
-                  </td>
-                </tr>
-              ))}
+            <tbody className="divide-y divide-gray-100">
+              {filteredExpenses.map((exp: any) => {
+                const dateObj = exp.expenseDate || exp.expense_date ? new Date(exp.expenseDate || exp.expense_date) : null;
+                const formattedDate = dateObj ? dateObj.toLocaleDateString() : 'N/A';
+                return (
+                  <tr key={exp.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">{formattedDate}</td>
+                    <td className="px-6 py-4 font-medium text-gray-900">{exp.category}</td>
+                    <td className="px-6 py-4">{exp.description || exp.notes || '-'}</td>
+                    <td className="px-6 py-4 text-right font-semibold text-gray-900">
+                      PKR {Number(exp.amount || 0).toLocaleString()}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-        ) : (
-          <Empty 
-            title="No expenses logged" 
-            detail="No expense records found matching the active filter selection." 
-            action={
-              <Button onClick={() => setModal(true)} testId="button-empty-add-expense">
-                <Plus size={15} /> Log expense
-              </Button>
-            } 
-          />
         )}
       </div>
 
-      {modal && (
-        <Modal title="Log expense" eyebrow="Bakery floor costs" onClose={() => setModal(false)}>
-          <form onSubmit={submit} className="grid gap-3">
-            <Field 
-              label="Title / Purpose" 
-              name="expense-title" 
-              value={form.title} 
-              onChange={(v: string) => setForm({ ...form, title: v })} 
-              placeholder="e.g. Electricity bill, Generator diesel"
-              required 
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <Field 
-                label="Amount" 
-                name="expense-amount" 
-                type="number" 
-                value={form.amount} 
-                onChange={(v: string) => setForm({ ...form, amount: v })} 
-                required 
-              />
-              <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
-                Category
-                <select
-                  value={form.category}
-                  onChange={e => setForm({ ...form, category: e.target.value })}
-                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary"
+      {/* Add Expense Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-900">Record New Expense</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Category</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g., Rent, Electricity, Tea"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Amount (PKR)</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="any"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Date</label>
+                <input
+                  type="date"
+                  required
+                  value={expenseDate}
+                  onChange={(e) => setExpenseDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Description / Notes</label>
+                <textarea
+                  rows={2}
+                  placeholder="Additional details..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
                 >
-                  {categories.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <Field 
-              label="Notes (optional)" 
-              name="expense-notes" 
-              value={form.notes} 
-              onChange={(v: string) => setForm({ ...form, notes: v })} 
-              placeholder="Paid via cash drawer..."
-            />
-            <Button type="submit" disabled={create.isPending} testId="button-save-expense">
-              {create.isPending ? 'Logging…' : 'Save expense'}
-            </Button>
-          </form>
-        </Modal>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createExpenseMutation.isPending}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {createExpenseMutation.isPending ? 'Saving...' : 'Save Expense'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

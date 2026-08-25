@@ -778,15 +778,32 @@ export function useGetExpenses(_options?: any) {
   return useQuery({
     queryKey: ['expenses'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('expenses').select('*');
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('*')
+        .order('expense_date', { ascending: false, nullsFirst: false });
+
       if (error) throw error;
-      return (data || []).map(e => ({
-        id: e.id,
-        category: e.category,
-        amount: e.amount,
-        description: e.description,
-        expenseDate: e.expense_date,
-      }));
+
+      return (data || []).map((e: any) => {
+        const rawDate = e.expense_date || e.created_at || new Date().toISOString();
+        const categoryName = e.category || 'General';
+        const desc = e.description || '';
+
+        return {
+          id: e.id,
+          category: categoryName,
+          amount: Number(e.amount) || 0,
+          description: desc,
+          // Support multiple property naming conventions to prevent frontend crashes:
+          title: categoryName,
+          notes: desc,
+          expenseDate: rawDate,
+          expense_date: rawDate,
+          created_at: e.created_at || rawDate,
+          date: rawDate,
+        };
+      });
     },
   });
 }
@@ -795,12 +812,19 @@ export function useCreateExpense() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ data }: { data: any }) => {
-      const { data: res, error } = await supabase.from('expenses').insert([{
-        category: data.category,
-        amount: data.amount,
-        description: data.description,
-        expense_date: data.expenseDate,
-      }]).select();
+      const formattedDate = data.expenseDate || data.expense_date || new Date().toISOString();
+      const { data: res, error } = await supabase
+        .from('expenses')
+        .insert([
+          {
+            category: data.category,
+            amount: Number(data.amount) || 0,
+            description: data.description || data.notes || '',
+            expense_date: formattedDate,
+          },
+        ])
+        .select();
+
       if (error) throw error;
       return res;
     },
