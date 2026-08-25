@@ -36,20 +36,20 @@ export function Hero({ onGetStarted }: HeroProps) {
   return (
     <div className="relative min-h-screen w-full font-sans select-none overflow-hidden flex flex-col justify-between">
       
-      {/* BACKGROUND IMAGES (Fully Visible with Subtle Dimming) */}
+      {/* FULL BACKGROUND IMAGES (Fully Visible) */}
       <div className="absolute inset-0 pointer-events-none z-0">
         {snackSlides.map((slide, idx) => (
           <div
             key={slide.image}
             className={`absolute inset-0 bg-cover bg-center transition-all duration-1000 ease-in-out ${
-              idx === currentIndex ? 'opacity-90 scale-100' : 'opacity-0 scale-105'
+              idx === currentIndex ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
             }`}
             style={{ backgroundImage: `url('${slide.image}')` }}
           />
         ))}
 
-        {/* Slight Light Filter so images are visible yet text pops */}
-        <div className="absolute inset-0 bg-white/20" />
+        {/* Very subtle dim overlay so background photos stay vibrant */}
+        <div className="absolute inset-0 bg-black/30" />
       </div>
 
       {/* TOP HEADER */}
@@ -80,35 +80,30 @@ export function Hero({ onGetStarted }: HeroProps) {
         </div>
       </header>
 
-      {/* MAIN CENTER CONTENT */}
+      {/* MAIN CENTER CONTENT (NO BACKGROUND CARD) */}
       <main className="relative z-10 max-w-4xl mx-auto px-6 py-12 flex-1 flex flex-col items-center justify-center text-center">
         
-        {/* Text Container with subtle blur to maximize clarity */}
-        <div className="bg-white/40 backdrop-blur-sm p-6 sm:p-10 rounded-2xl border border-white/30 shadow-lg flex flex-col items-center">
-          
-          {/* Dynamic Title */}
-          <div className="min-h-[100px] sm:min-h-[120px] flex items-center justify-center">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-950 tracking-tight leading-tight max-w-3xl transition-all duration-500">
-              {snackSlides[currentIndex].title}
-            </h2>
-          </div>
+        {/* Dynamic Title */}
+        <div className="min-h-[100px] sm:min-h-[120px] flex items-center justify-center">
+          <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight max-w-3xl transition-all duration-500 drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
+            {snackSlides[currentIndex].title}
+          </h2>
+        </div>
 
-          {/* Dynamic Subtitle */}
-          <p className="mt-3 text-sm sm:text-lg text-slate-900 max-w-xl font-bold leading-relaxed min-h-[60px]">
-            {snackSlides[currentIndex].subtitle}
-          </p>
+        {/* Dynamic Subtitle */}
+        <p className="mt-4 text-sm sm:text-lg text-slate-100 max-w-xl font-bold leading-relaxed min-h-[60px] drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+          {snackSlides[currentIndex].subtitle}
+        </p>
 
-          {/* Action Button */}
-          <div className="mt-6">
-            <button
-              onClick={onGetStarted}
-              className="group inline-flex items-center gap-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm px-9 py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform active:scale-95"
-            >
-              Get Started
-              <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
-            </button>
-          </div>
-
+        {/* Action Button */}
+        <div className="mt-8">
+          <button
+            onClick={onGetStarted}
+            className="group inline-flex items-center gap-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm px-9 py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform active:scale-95"
+          >
+            Get Started
+            <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+          </button>
         </div>
 
       </main>
