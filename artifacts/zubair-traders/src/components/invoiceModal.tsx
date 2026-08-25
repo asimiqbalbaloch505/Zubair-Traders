@@ -29,137 +29,142 @@ export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceMod
 
   return (
     <Modal title={`Invoice #${cleanInvoiceNo}`} eyebrow="Official Sales Invoice" onClose={onClose}>
-      <div className="printable-invoice relative p-6 bg-white text-black rounded-lg border border-border overflow-hidden">
+      {/* Viewport Centering Container */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs overflow-y-auto print:static print:bg-transparent print:p-0">
         
-        {/* Zubair Traders Background Watermark */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.04]">
-          <span className="text-7xl font-extrabold uppercase tracking-widest text-black -rotate-12">
-            ZUBAIR TRADERS
-          </span>
-        </div>
+        {/* Printable Invoice Card */}
+        <div className="printable-invoice relative w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 bg-white text-black rounded-lg border border-border shadow-xl print:max-h-none print:shadow-none print:border-none print:p-0">
+          
+          {/* Zubair Traders Background Watermark */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.04]">
+            <span className="text-7xl font-extrabold uppercase tracking-widest text-black -rotate-12">
+              ZUBAIR TRADERS
+            </span>
+          </div>
 
-        {/* Professional Header with Logo */}
-        <div className="relative flex justify-between items-start border-b border-black/20 pb-4 mb-4">
-          <div className="flex items-center gap-3">
-            <img 
-              src="/gemini-svg.svg" 
-              alt="Zubair Traders Logo" 
-              className="h-10 w-10 object-contain shrink-0" 
-            />
-            <div>
-              <h1 className="text-xl font-bold uppercase tracking-wider text-black leading-tight">
-                Zubair Traders
-              </h1>
-              <p className="text-xs text-gray-600 font-medium">
-                Bakery & General Traders Management
+          {/* Professional Header with Logo */}
+          <div className="relative flex justify-between items-start border-b border-black/20 pb-4 mb-4">
+            <div className="flex items-center gap-3">
+              <img 
+                src="/gemini-svg.svg" 
+                alt="Zubair Traders Logo" 
+                className="h-10 w-10 object-contain shrink-0" 
+              />
+              <div>
+                <h1 className="text-xl font-bold uppercase tracking-wider text-black leading-tight">
+                  Zubair Traders
+                </h1>
+                <p className="text-xs text-gray-600 font-medium">
+                  Bakery & General Traders Management
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <span className="inline-block px-3 py-1 bg-black text-white text-xs font-bold uppercase rounded">
+                Tax Invoice
+              </span>
+              <p className="text-xs text-gray-600 font-mono mt-1">
+                Inv #: {cleanInvoiceNo}
               </p>
             </div>
           </div>
 
-          <div className="text-right">
-            <span className="inline-block px-3 py-1 bg-black text-white text-xs font-bold uppercase rounded">
-              Tax Invoice
-            </span>
-            <p className="text-xs text-gray-600 font-mono mt-1">
-              Inv #: {cleanInvoiceNo}
-            </p>
-          </div>
-        </div>
-
-        {/* Customer & Date Info */}
-        <div className="relative grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded border border-gray-200 text-xs mb-4">
-          <div>
-            <p className="text-gray-500 uppercase text-[10px] font-bold">
-              Customer Name
-            </p>
-            <p className="font-bold text-black text-sm">
-              {sale.buyerName || sale.buyer_name || 'Walk-in Customer'}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-gray-500 uppercase text-[10px] font-bold">Transaction Date</p>
-            <p className="font-semibold text-black">
-              {formattedDate}
-            </p>
-          </div>
-        </div>
-
-        {/* Line Items Table */}
-        {sale.items && sale.items.length > 0 ? (
-          <div className="border border-gray-200 rounded overflow-hidden mb-4">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-100 border-b border-gray-200 text-black font-bold uppercase text-[10px]">
-                <tr>
-                  <th className="p-2">Item Description</th>
-                  <th className="p-2 text-center">Qty</th>
-                  <th className="p-2 text-right">Unit Price</th>
-                  <th className="p-2 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {sale.items.map((item: any, idx: number) => {
-                  const qty = Number(item.quantity ?? item.qty ?? 1);
-                  const uPrice = Number(item.unitPrice ?? item.unit_price ?? item.price ?? 0);
-                  const tPrice = Number(item.totalPrice ?? item.total_price ?? (qty * uPrice));
-
-                  return (
-                    <tr key={idx} className="print-keep-together">
-                      <td className="p-2 font-medium text-black">
-                        {item.productName || item.product_name || 'Product'}
-                      </td>
-                      <td className="p-2 text-center">{qty}</td>
-                      <td className="p-2 text-right">{money(uPrice)}</td>
-                      <td className="p-2 text-right font-mono font-bold">{money(tPrice)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="rounded border bg-gray-50 p-3 text-center text-xs text-gray-500 mb-4">
-            No itemized products linked to this invoice.
-          </div>
-        )}
-
-        {/* Total Summary */}
-        <div className="relative flex justify-end mb-6">
-          <div className="w-64 space-y-1.5 bg-gray-50 border border-gray-200 p-3 rounded text-xs">
-            <div className="flex justify-between text-gray-700">
-              <span>Total Amount:</span>
-              <span className="font-mono font-bold text-black">{money(total)}</span>
+          {/* Customer & Date Info */}
+          <div className="relative grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded border border-gray-200 text-xs mb-4">
+            <div>
+              <p className="text-gray-500 uppercase text-[10px] font-bold">
+                Customer Name
+              </p>
+              <p className="font-bold text-black text-sm">
+                {sale.buyerName || sale.buyer_name || 'Walk-in Customer'}
+              </p>
             </div>
-            <div className="flex justify-between text-emerald-800">
-              <span>Paid Amount:</span>
-              <span className="font-mono font-bold">{money(paid)}</span>
-            </div>
-            <div className="flex justify-between text-red-700 border-t border-gray-300 pt-1 font-bold">
-              <span>Balance Due:</span>
-              <span className="font-mono">{money(due)}</span>
+            <div className="text-right">
+              <p className="text-gray-500 uppercase text-[10px] font-bold">Transaction Date</p>
+              <p className="font-semibold text-black">
+                {formattedDate}
+              </p>
             </div>
           </div>
-        </div>
 
-        {sale.notes && (
-          <div className="text-xs text-gray-600 mb-4">
-            <strong className="text-black">Notes:</strong> {sale.notes}
+          {/* Line Items Table */}
+          {sale.items && sale.items.length > 0 ? (
+            <div className="border border-gray-200 rounded overflow-hidden mb-4">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-100 border-b border-gray-200 text-black font-bold uppercase text-[10px]">
+                  <tr>
+                    <th className="p-2">Item Description</th>
+                    <th className="p-2 text-center">Qty</th>
+                    <th className="p-2 text-right">Unit Price</th>
+                    <th className="p-2 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {sale.items.map((item: any, idx: number) => {
+                    const qty = Number(item.quantity ?? item.qty ?? 1);
+                    const uPrice = Number(item.unitPrice ?? item.unit_price ?? item.price ?? 0);
+                    const tPrice = Number(item.totalPrice ?? item.total_price ?? (qty * uPrice));
+
+                    return (
+                      <tr key={idx} className="print-keep-together">
+                        <td className="p-2 font-medium text-black">
+                          {item.productName || item.product_name || 'Product'}
+                        </td>
+                        <td className="p-2 text-center">{qty}</td>
+                        <td className="p-2 text-right">{money(uPrice)}</td>
+                        <td className="p-2 text-right font-mono font-bold">{money(tPrice)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded border bg-gray-50 p-3 text-center text-xs text-gray-500 mb-4">
+              No itemized products linked to this invoice.
+            </div>
+          )}
+
+          {/* Total Summary */}
+          <div className="relative flex justify-end mb-6">
+            <div className="w-64 space-y-1.5 bg-gray-50 border border-gray-200 p-3 rounded text-xs">
+              <div className="flex justify-between text-gray-700">
+                <span>Total Amount:</span>
+                <span className="font-mono font-bold text-black">{money(total)}</span>
+              </div>
+              <div className="flex justify-between text-emerald-800">
+                <span>Paid Amount:</span>
+                <span className="font-mono font-bold">{money(paid)}</span>
+              </div>
+              <div className="flex justify-between text-red-700 border-t border-gray-300 pt-1 font-bold">
+                <span>Balance Due:</span>
+                <span className="font-mono">{money(due)}</span>
+              </div>
+            </div>
           </div>
-        )}
 
-        {/* Invoice Footer Stamp */}
-        <div className="relative text-center border-t border-gray-200 pt-3">
-          <p className="text-xs font-bold text-black">Thank you for your business!</p>
-          <p className="text-[10px] text-gray-500 mt-0.5">Zubair Traders • Authorized Computer Generated Receipt</p>
-        </div>
+          {sale.notes && (
+            <div className="text-xs text-gray-600 mb-4">
+              <strong className="text-black">Notes:</strong> {sale.notes}
+            </div>
+          )}
 
-        {/* Non-Printable Action Buttons */}
-        <div className="flex justify-end gap-2 pt-4 print:hidden border-t mt-4">
-          <Button variant="outline" testId="button-modal-print" onClick={handlePrint}>
-            <Printer size={15} /> Print / Save PDF
-          </Button>
-          <Button testId="button-modal-close" onClick={onClose}>
-            Close
-          </Button>
+          {/* Invoice Footer Stamp */}
+          <div className="relative text-center border-t border-gray-200 pt-3">
+            <p className="text-xs font-bold text-black">Thank you for your business!</p>
+            <p className="text-[10px] text-gray-500 mt-0.5">Zubair Traders • Authorized Computer Generated Receipt</p>
+          </div>
+
+          {/* Non-Printable Action Buttons */}
+          <div className="flex justify-end gap-2 pt-4 print:hidden border-t mt-4">
+            <Button variant="outline" testId="button-modal-print" onClick={handlePrint}>
+              <Printer size={15} /> Print / Save PDF
+            </Button>
+            <Button testId="button-modal-close" onClick={onClose}>
+              Close
+            </Button>
+          </div>
         </div>
       </div>
     </Modal>
