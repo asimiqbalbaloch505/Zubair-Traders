@@ -1,44 +1,76 @@
 import React, { useState, useMemo } from 'react';
-import { useGetExpenses, useCreateExpense } from '../hooks/useSupabaseData';
-import { Plus, Search, Calendar, Filter, DollarSign, Tag, FileText } from 'lucide-react';
+import { Plus, Search, Filter } from 'lucide-react';
+import { 
+  useGetExpenses, 
+  getGetExpensesQueryKey, 
+  useCreateExpense 
+} from '../hooks/useSupabaseData';
+import { useQueryClient } from '@tanstack/react-query';
 
-export function Expenses() {
-  const { data: rawExpenses = [], isLoading, error } = useGetExpenses();
-  const createExpenseMutation = useCreateExpense();
+export function Expenses({ PageIntro, Button, Field, Modal, Loading, Failed, Empty, money, timeDate }: any) {
+  const q = useGetExpenses({ query: { queryKey: getGetExpensesQueryKey() } });
+  const create = useCreateExpense();
+  const qc = useQueryClient();
 
-  // 1. Controls State with Defaults
+  // Control Defaults
   const todayStr = new Date().toISOString().split('T')[0];
-  const currentMonthStr = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
 
-  const [filterMode, setFilterMode] = useState<'all' | 'today' | 'this_month' | 'custom_month' | 'custom_date'>('this_month');
+  // Filter States
+  const [filterMode, setFilterMode] = useState<'all' | 'today' | 'this_month' | 'custom_month' | 'custom_date'>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Form State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [category, setCategory] = useState('');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [expenseDate, setExpenseDate] = useState(todayStr);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({
+    title: '',
+    amount: '',
+    category: 'Utilities',
+    notes: '',
+    expenseDate: todayStr
+  });
 
-  // 2. Filter Logic with Safe Fallbacks
+  const categories = ['Utilities', 'Rent', 'Salaries', 'Maintenance', 'Fuel', 'Supplies', 'Misc'];
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    create.mutate(
+      {
+        data: {
+          ...form,
+          amount: Number(form.amount),
+          expenseDate: form.expenseDate ? new Date(form.expenseDate).toISOString() : new Date().toISOString()
+        }
+      },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetExpensesQueryKey() });
+          setModal(false);
+          setForm({ title: '', amount: '', category: 'Utilities', notes: '', expenseDate: todayStr });
+        }
+      }
+    );
+  };
+
+  // Filter Logic
   const filteredExpenses = useMemo(() => {
-    return rawExpenses.filter((exp: any) => {
-      // Safe Date Extraction
-      const rawDateStr = exp.expenseDate || exp.expense_date || exp.created_at;
+    if (!q.data) return [];
+
+    return q.data.filter((exp: any) => {
+      const rawDateStr = exp.expense_date || exp.expenseDate || exp.created_at || exp.createdAt;
       const dateObj = rawDateStr ? new Date(rawDateStr) : new Date();
-      
-      // Text Search
+
+      // Search Query Matching
       const query = searchQuery.toLowerCase();
-      const matchesSearch =
-        (exp.category || '').toLowerCase().includes(query) ||
-        (exp.description || exp.notes || '').toLowerCase().includes(query) ||
-        (exp.amount || '').toString().includes(query);
+      const titleMatch = (exp.title || exp.category || '').toLowerCase().includes(query);
+      const noteMatch = (exp.notes || exp.description || '').toLowerCase().includes(query);
+      const amountMatch = (exp.amount || '').toString().includes(query);
 
-      if (!matchesSearch) return false;
+      if (!titleMatch && !noteMatch && !amountMatch) return false;
 
-      // Filter Mode Checks
+      // Date Filtering Mode
       if (filterMode === 'all') return true;
 
       if (filterMode === 'today') {
@@ -74,74 +106,55 @@ export function Expenses() {
 
       return true;
     });
-  }, [rawExpenses, filterMode, selectedMonth, selectedDate, searchQuery]);
+  }, [q.data, filterMode, selectedMonth, selectedDate, searchQuery]);
 
-  // Calculations
-  const totalExpenseAmount = useMemo(() => {
-    return filteredExpenses.reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0);
-  }, [filteredExpenses]);
-
-  // Form Submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!category || !amount) return;
-
-    try {
-      await createExpenseMutation.mutateAsync({
-        data: {
-          category,
-          amount: parseFloat(amount),
-          description,
-          expenseDate: new Date(expenseDate).toISOString(),
-        },
-      });
-      setIsModalOpen(false);
-      setCategory('');
-      setAmount('');
-      setDescription('');
-      setExpenseDate(todayStr);
-    } catch (err: any) {
-      alert(`Failed to add expense: ${err.message}`);
-    }
-  };
+  const totalExpense = filteredExpenses.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Expenses Tracker</h1>
-          <p className="text-sm text-gray-500">Monitor and log business operational operational costs</p>
+    <div className="animate-in">
+      <PageIntro 
+        eyebrow="Floor overhead & operational costs" 
+        title="Expenses" 
+        detail="Log everyday bakery costs to keep daily net profit accurate." 
+        action={
+          <Button onClick={() => setModal(true)} testId="button-add-expense">
+            <Plus size={16} /> Log expense
+          </Button>
+        } 
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="panel rounded-xl p-4">
+          <div className="text-xs font-bold uppercase text-muted-foreground">Total logged expenses</div>
+          <div className="mt-2 font-mono text-2xl font-bold text-destructive">{money(totalExpense)}</div>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition"
-        >
-          <Plus className="w-5 h-5 mr-2" /> Record Expense
-        </button>
+        <div className="panel rounded-xl p-4">
+          <div className="text-xs font-bold uppercase text-muted-foreground">Recorded entries</div>
+          <div className="mt-2 font-mono text-2xl font-bold">{filteredExpenses.length}</div>
+        </div>
       </div>
 
       {/* Side-by-Side Control Bar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
-        {/* Search */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+      <div className="panel mt-5 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-center">
+        {/* Search Input */}
+        <div className="relative flex items-center">
+          <Search size={15} className="absolute left-3 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search expense or note..."
+            placeholder="Search title or note..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm font-medium text-foreground outline-none focus:border-primary"
           />
         </div>
 
         {/* Filter Mode Dropdown */}
-        <div className="relative">
-          <Filter className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+        <div className="relative flex items-center">
+          <Filter size={15} className="absolute left-3 text-muted-foreground" />
           <select
             value={filterMode}
             onChange={(e: any) => setFilterMode(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm font-medium text-foreground outline-none focus:border-primary"
           >
             <option value="all">All Time</option>
             <option value="today">Today</option>
@@ -151,150 +164,136 @@ export function Expenses() {
           </select>
         </div>
 
-        {/* Month Selector (Always Visible) */}
+        {/* Month Selector */}
         <div>
           <input
             type="month"
             value={selectedMonth}
             disabled={filterMode !== 'custom_month'}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none ${
-              filterMode !== 'custom_month' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white'
+            className={`h-10 w-full rounded-lg border border-input px-3 text-sm font-medium outline-none focus:border-primary ${
+              filterMode !== 'custom_month' ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'bg-background text-foreground'
             }`}
           />
         </div>
 
-        {/* Date Picker (Always Visible) */}
+        {/* Date Picker */}
         <div>
           <input
             type="date"
             value={selectedDate}
             disabled={filterMode !== 'custom_date'}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none ${
-              filterMode !== 'custom_date' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white'
+            className={`h-10 w-full rounded-lg border border-input px-3 text-sm font-medium outline-none focus:border-primary ${
+              filterMode !== 'custom_date' ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'bg-background text-foreground'
             }`}
           />
         </div>
       </div>
 
-      {/* Summary Card */}
-      <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center justify-between">
-        <span className="text-sm font-medium text-indigo-900">Total Filtered Expenses</span>
-        <span className="text-xl font-bold text-indigo-700">PKR {totalExpenseAmount.toLocaleString()}</span>
-      </div>
-
-      {/* Expenses Data Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {isLoading ? (
-          <div className="p-8 text-center text-gray-500">Loading expenses...</div>
-        ) : error ? (
-          <div className="p-8 text-center text-red-500">Error fetching expenses data.</div>
-        ) : filteredExpenses.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No expense records match your filter.</div>
-        ) : (
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 text-gray-700 font-semibold border-b border-gray-200">
+      <div className="panel mt-5 overflow-x-auto rounded-xl p-5">
+        {q.isLoading ? (
+          <Loading />
+        ) : q.isError ? (
+          <Failed onRetry={() => q.refetch()} />
+        ) : filteredExpenses.length ? (
+          <table className="w-full min-w-[650px] text-left text-sm">
+            <thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-6 py-3">Date</th>
-                <th className="px-6 py-3">Category</th>
-                <th className="px-6 py-3">Description / Note</th>
-                <th className="px-6 py-3 text-right">Amount (PKR)</th>
+                <th className="pb-3">Title & Category</th>
+                <th className="pb-3">Note</th>
+                <th className="pb-3">Logged time</th>
+                <th className="pb-3 text-right">Amount</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredExpenses.map((exp: any) => {
-                const dateObj = exp.expenseDate || exp.expense_date ? new Date(exp.expenseDate || exp.expense_date) : null;
-                const formattedDate = dateObj ? dateObj.toLocaleDateString() : 'N/A';
-                return (
-                  <tr key={exp.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">{formattedDate}</td>
-                    <td className="px-6 py-4 font-medium text-gray-900">{exp.category}</td>
-                    <td className="px-6 py-4">{exp.description || exp.notes || '-'}</td>
-                    <td className="px-6 py-4 text-right font-semibold text-gray-900">
-                      PKR {Number(exp.amount || 0).toLocaleString()}
-                    </td>
-                  </tr>
-                );
-              })}
+            <tbody className="divide-y divide-border/70">
+              {filteredExpenses.map((exp: any) => (
+                <tr key={exp.id} data-testid={`row-expense-${exp.id}`}>
+                  <td className="py-3">
+                    <div className="font-semibold">{exp.title || exp.category}</div>
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {exp.category}
+                    </span>
+                  </td>
+                  <td className="py-3 text-xs text-muted-foreground">{exp.notes || exp.description || '—'}</td>
+                  <td className="py-3 font-mono text-xs text-muted-foreground">
+                    {timeDate(exp.expense_date || exp.expenseDate || exp.created_at || exp.createdAt)}
+                  </td>
+                  <td className="py-3 text-right font-mono font-bold text-destructive">
+                    {money(exp.amount)}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
+        ) : (
+          <Empty 
+            title="No expenses logged" 
+            detail="Keep track of fuel, electricity, repairs, and minor floor expenditures." 
+            action={
+              <Button onClick={() => setModal(true)} testId="button-empty-add-expense">
+                <Plus size={15} /> Log expense
+              </Button>
+            } 
+          />
         )}
       </div>
 
-      {/* Add Expense Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
-            <h2 className="text-lg font-bold text-gray-900">Record New Expense</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Category</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g., Rent, Electricity, Tea"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Amount (PKR)</label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="any"
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Date</label>
-                <input
-                  type="date"
-                  required
-                  value={expenseDate}
-                  onChange={(e) => setExpenseDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Description / Notes</label>
-                <textarea
-                  rows={2}
-                  placeholder="Additional details..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+      {modal && (
+        <Modal title="Log expense" eyebrow="Bakery floor costs" onClose={() => setModal(false)}>
+          <form onSubmit={submit} className="grid gap-3">
+            <Field 
+              label="Title / Purpose" 
+              name="expense-title" 
+              value={form.title} 
+              onChange={(v: string) => setForm({ ...form, title: v })} 
+              placeholder="e.g. Electricity bill, Generator diesel"
+              required 
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <Field 
+                label="Amount" 
+                name="expense-amount" 
+                type="number" 
+                value={form.amount} 
+                onChange={(v: string) => setForm({ ...form, amount: v })} 
+                required 
+              />
+              <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+                Category
+                <select
+                  value={form.category}
+                  onChange={e => setForm({ ...form, category: e.target.value })}
+                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createExpenseMutation.isPending}
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {createExpenseMutation.isPending ? 'Saving...' : 'Save Expense'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+                  {categories.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+              Expense Date
+              <input
+                type="date"
+                required
+                value={form.expenseDate}
+                onChange={e => setForm({ ...form, expenseDate: e.target.value })}
+                className="h-10 rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary"
+              />
+            </label>
+            <Field 
+              label="Notes (optional)" 
+              name="expense-notes" 
+              value={form.notes} 
+              onChange={(v: string) => setForm({ ...form, notes: v })} 
+              placeholder="Paid via cash drawer..."
+            />
+            <Button type="submit" disabled={create.isPending} testId="button-save-expense">
+              {create.isPending ? 'Logging…' : 'Save expense'}
+            </Button>
+          </form>
+        </Modal>
       )}
     </div>
   );
