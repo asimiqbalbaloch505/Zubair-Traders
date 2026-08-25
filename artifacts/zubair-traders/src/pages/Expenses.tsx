@@ -41,7 +41,13 @@ export function Expenses({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
         data: {
           ...form,
           amount: Number(form.amount),
-          expenseDate: form.expenseDate ? new Date(form.expenseDate).toISOString() : new Date().toISOString()
+          expenseDate: (() => {
+  if (!form.expenseDate) return new Date().toISOString();
+  const now = new Date();
+  const [year, month, day] = form.expenseDate.split('-').map(Number);
+  const localDate = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds());
+  return localDate.toISOString();
+})()
         }
       },
       {
