@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { ErrorDialog } from '../components/ErrorDialog';
 import { 
   Plus, Check, X, FileText, ShoppingCart, AlertCircle, Building2, UserPlus, Edit3, CheckCircle2
 } from 'lucide-react';
@@ -54,6 +55,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
 
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [stockError, setStockError] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoice | null>(null);
 
   const [buyerId, setBuyerId] = useState('');
@@ -149,7 +151,7 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     const availableStock = Number(prod.stockQuantity ?? prod.stock_quantity ?? prod.stock ?? prod.quantity ?? 0);
 
     if (availableStock <= 0) {
-      setErrorMessage(`Cannot add "${prod.name}" as it is currently out of stock.`);
+      setStockError(`Cannot add "${prod.name}" as it is currently out of stock.`);
       return;
     }
 
@@ -160,11 +162,12 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
     const currentCartQty = existingCartItem ? existingCartItem.quantity : 0;
 
     if (currentCartQty + requestedQty > availableStock) {
-      setErrorMessage(`Cannot add line item. Total requested (${currentCartQty + requestedQty}) exceeds available stock (${availableStock}).`);
+      setStockError(`Cannot add line item. Total requested (${currentCartQty + requestedQty}) exceeds available stock (${availableStock}).`);
       return;
     }
 
     setErrorMessage(null);
+    setStockError(null);
 
     setItems(prev => {
       if (existingCartItem) {
@@ -747,6 +750,14 @@ export function Sales({ PageIntro, Button, Field, Modal, Loading, Failed, Empty,
           money={money}
         />
       )}
+
+      {/* Viewport-Centered Stock Alert Error Dialog */}
+      <ErrorDialog
+        open={!!stockError}
+        title="Stock Limit Exceeded"
+        description={stockError}
+        onClose={() => setStockError(null)}
+      />
     </div>
   );
 }
