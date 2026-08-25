@@ -29,11 +29,11 @@ export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceMod
 
   return (
     <Modal title={`Invoice #${cleanInvoiceNo}`} eyebrow="Official Sales Invoice" onClose={onClose}>
-      {/* Viewport Centering Container */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs overflow-y-auto print:static print:bg-transparent print:p-0">
+      {/* Viewport Centering Wrapper (Only affects screen visibility & centering) */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none print:contents">
         
-        {/* Printable Invoice Card */}
-        <div className="printable-invoice relative w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 bg-white text-black rounded-lg border border-border shadow-xl print:max-h-none print:shadow-none print:border-none print:p-0">
+        {/* Your Original Unchanged Invoice Container & Design */}
+        <div className="printable-invoice pointer-events-auto relative p-6 bg-white text-black rounded-lg border border-border overflow-hidden">
           
           {/* Zubair Traders Background Watermark */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.04]">
@@ -166,6 +166,7 @@ export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceMod
             </Button>
           </div>
         </div>
+
       </div>
     </Modal>
   );
