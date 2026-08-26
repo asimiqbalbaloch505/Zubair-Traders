@@ -1,5 +1,6 @@
 import React from 'react';
 import { Printer } from 'lucide-react';
+import { InvoiceModal } from './components/invoiceModal';
 
 export interface InvoiceModalProps {
   sale: any;

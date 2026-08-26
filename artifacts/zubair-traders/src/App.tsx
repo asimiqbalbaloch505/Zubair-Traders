@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { InvoiceModal } from './components/invoiceModal';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { 
   ShoppingCart, Users, Package, Truck, Wallet, 
@@ -207,6 +208,7 @@ function MainApp() {
     Button,
     Field,
     Modal,
+    InvoiceModal,
     Loading,
     Failed,
     Empty,
