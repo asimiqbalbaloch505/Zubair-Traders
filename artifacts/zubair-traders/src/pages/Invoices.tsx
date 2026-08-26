@@ -307,7 +307,7 @@ const cleanNum = String(invNo).replace(/^(INV|PUR|REC)-?/i, '');
             id: selectedInvoice.id,
             invoice_number: selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.purchaseNumber || selectedInvoice.id,
             buyer_name: selectedInvoice.buyerName || selectedInvoice.buyer_name || 'Walk-in Customer',
-            transaction_time: selectedInvoice.created_at || selectedInvoice.transactionTime || selectedInvoice.transaction_time || selectedInvoice.date,
+            created_at: selectedInvoice.created_at || selectedInvoice.transactionTime || selectedInvoice.transaction_time || selectedInvoice.date,
             total_amount: selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0,
             paid_amount: selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0,
             due_amount: selectedInvoice.dueAmount ?? selectedInvoice.due_amount ?? 0,
