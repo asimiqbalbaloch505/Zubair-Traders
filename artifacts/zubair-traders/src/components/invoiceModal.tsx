@@ -12,17 +12,52 @@ export interface InvoiceModalProps {
 export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceModalProps) {
   if (!Modal || !sale) return null;
 
-  const formattedDate = sale.created_at || sale.transactionTime 
-    ? new Date(sale.created_at || sale.transactionTime).toLocaleString('en-PK', {
+  // 1. Robust Date Extraction
+  const rawDate = 
+    sale.created_at || 
+    sale.createdAt || 
+    sale.transactionTime || 
+    sale.transaction_date || 
+    sale.date || 
+    sale.timestamp;
+
+  const formattedDate = rawDate 
+    ? new Date(rawDate).toLocaleString('en-PK', {
         dateStyle: 'medium',
         timeStyle: 'short',
       })
     : 'N/A';
 
+  // 2. Invoice Metadata & Type Checks
   const rawInv = sale.invoice_number || sale.invoiceNumber || sale.id || 'NEW';
   const cleanInvoiceNo = String(rawInv).replace(/^INV-?/i, '');
-  const total = sale.total_amount ?? sale.totalAmount ?? 0;
-  const paid = sale.paid_amount ?? sale.paidAmount ?? 0;
+  
+  const isPurchase = 
+    sale.type === 'purchase' || 
+    String(rawInv).startsWith('PUR') || 
+    !!sale.supplier_name || 
+    !!sale.supplierName;
+
+  const isUdharCollection = 
+    sale.type === 'udhar' || 
+    sale.type === 'udhar_collection' || 
+    String(rawInv).startsWith('REC') ||
+    sale.isUdharPayment;
+
+  // 3. Entity Name Resolution
+  const entityLabel = isPurchase ? 'Supplier Name' : 'Customer Name';
+  const entityName = 
+    sale.supplier_name || 
+    sale.supplierName || 
+    sale.buyerName || 
+    sale.buyer_name || 
+    sale.customer_name || 
+    sale.customerName || 
+    'Walk-in Customer';
+
+  // 4. Financial Calculations
+  const total = sale.total_amount ?? sale.totalAmount ?? sale.amount ?? 0;
+  const paid = sale.paid_amount ?? sale.paidAmount ?? total;
   const due = sale.due_amount ?? sale.dueAmount ?? Math.max(total - paid, 0);
 
   const handlePrint = () => {
@@ -30,19 +65,19 @@ export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceMod
   };
 
   return (
-    <Modal title={`Invoice #${cleanInvoiceNo}`} eyebrow="Official Sales Invoice" onClose={onClose}>
+    <Modal title={`Invoice #${cleanInvoiceNo}`} eyebrow={isPurchase ? "Official Purchase Invoice" : "Official Sales Invoice"} onClose={onClose}>
       <div className="printable-invoice relative bg-white text-black rounded-lg flex flex-col justify-between p-4">
         
         {/* TOP SECTION */}
         <div>
-          {/* Zubair Traders Background Watermark */}
+          {/* Watermark */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.04]">
             <span className="text-7xl font-extrabold uppercase tracking-widest text-black -rotate-12">
               ZUBAIR TRADERS
             </span>
           </div>
 
-          {/* Professional Header with Logo */}
+          {/* Header */}
           <div className="relative flex justify-between items-start border-b border-black/20 pb-3 mb-3">
             <div className="flex items-center gap-3">
               <img 
@@ -62,7 +97,7 @@ export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceMod
 
             <div className="text-right">
               <span className="inline-block px-3 py-0.5 bg-black text-white text-[10px] font-bold uppercase rounded">
-                Tax Invoice
+                {isPurchase ? 'Purchase Receipt' : isUdharCollection ? 'Payment Receipt' : 'Tax Invoice'}
               </span>
               <p className="text-xs text-gray-600 font-mono mt-1">
                 Inv #: {cleanInvoiceNo}
@@ -70,14 +105,14 @@ export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceMod
             </div>
           </div>
 
-          {/* Customer & Date Info */}
+          {/* Customer / Supplier & Date Info */}
           <div className="relative grid grid-cols-2 gap-4 bg-gray-50 p-2.5 rounded border border-gray-200 text-xs mb-3">
             <div>
               <p className="text-gray-500 uppercase text-[10px] font-bold">
-                Customer Name
+                {entityLabel}
               </p>
               <p className="font-bold text-black text-xs">
-                {sale.buyerName || sale.buyer_name || 'Walk-in Customer'}
+                {entityName}
               </p>
             </div>
             <div className="text-right">
@@ -88,8 +123,19 @@ export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceMod
             </div>
           </div>
 
-          {/* Line Items Table */}
-          {sale.items && sale.items.length > 0 ? (
+          {/* Line Items Table or Udhar Payment Box */}
+          {isUdharCollection ? (
+            <div className="border border-gray-200 bg-gray-50 rounded p-3 mb-3 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-gray-700">Payment Description:</span>
+                <span className="font-bold text-black">Udhar Payment Collected</span>
+              </div>
+              <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
+                <span className="font-medium text-gray-700">Collected Amount:</span>
+                <span className="font-mono font-bold text-black text-sm">{money(total)}</span>
+              </div>
+            </div>
+          ) : sale.items && sale.items.length > 0 ? (
             <div className="border border-gray-200 rounded overflow-hidden mb-3">
               <table className="w-full text-left text-xs">
                 <thead className="bg-gray-100 border-b border-gray-200 text-black font-bold uppercase text-[10px]">
@@ -103,13 +149,30 @@ export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceMod
                 <tbody className="divide-y divide-gray-200">
                   {sale.items.map((item: any, idx: number) => {
                     const qty = Number(item.quantity ?? item.qty ?? 1);
-                    const uPrice = Number(item.unitPrice ?? item.unit_price ?? item.price ?? 0);
-                    const tPrice = Number(item.totalPrice ?? item.total_price ?? (qty * uPrice));
+                    
+                    // Comprehensive Price Fallback (Sales + Purchase variations)
+                    const uPrice = Number(
+                      item.unitPrice ?? 
+                      item.unit_price ?? 
+                      item.price ?? 
+                      item.unit_cost ?? 
+                      item.unitCost ?? 
+                      item.cost_price ?? 
+                      item.costPrice ?? 
+                      0
+                    );
+                    
+                    const tPrice = Number(
+                      item.totalPrice ?? 
+                      item.total_price ?? 
+                      item.amount ?? 
+                      (qty * uPrice)
+                    );
 
                     return (
                       <tr key={idx}>
                         <td className="p-2 font-medium text-black">
-                          {item.productName || item.product_name || 'Product'}
+                          {item.productName || item.product_name || item.name || 'Product'}
                         </td>
                         <td className="p-2 text-center">{qty}</td>
                         <td className="p-2 text-right">{money(uPrice)}</td>
@@ -153,7 +216,7 @@ export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceMod
             </div>
           )}
 
-          {/* Invoice Footer Stamp */}
+          {/* Footer Stamp */}
           <div className="relative text-center border-t border-gray-200 pt-2">
             <p className="text-xs font-bold text-black">Thank you for your business!</p>
             <p className="text-[10px] text-gray-500 mt-0.5">Zubair Traders • Authorized Computer Generated Receipt</p>
