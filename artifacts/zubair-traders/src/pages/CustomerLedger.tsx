@@ -519,8 +519,8 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         </Modal>
       )}
 
-      {/* Invoice & Payment Receipt Detail Modal (Matching Design Layout) */}
-      {/* Invoice & Payment Receipt Detail Modal */}
+      
+      {/* Invoice & Payment Receipt Detail Modal */}
       {selectedRecord && (
         selectedRecord.type === 'INVOICE' ? (
           <InvoiceModal
@@ -536,35 +536,37 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
               items: selectedRecord.raw?.items || selectedRecord.raw?.sale_items || [],
             }}
             onClose={() => setSelectedRecord(null)}
+            Modal={Modal}
+            Button={Button}
             money={money}
-            timeDate={timeDate}
           />
         ) : (
-  <InvoiceModal
-    sale={{
-      id: selectedRecord.raw?.id || selectedRecord.id,
-      invoice_number: selectedRecord.refNo,
-      buyer_name: selectedRecord.buyerName,
-      transaction_time: selectedRecord.date,
-      total_amount: selectedRecord.amount,
-      paid_amount: selectedRecord.paidAmount,
-      due_amount: 0,
-      payment_status: 'paid',
-      items: [
-        {
-          id: selectedRecord.id,
-          product_name: selectedRecord.raw?.notes || 'Udhaar Payment Collection',
-          quantity: 1,
-          unit_price: selectedRecord.amount,
-          total_price: selectedRecord.amount,
-        },
-      ],
-    }}
-    onClose={() => setSelectedRecord(null)}
-    money={money}
-    timeDate={timeDate}
-  />
-)
+          <InvoiceModal
+            sale={{
+              id: selectedRecord.raw?.id || selectedRecord.id,
+              invoice_number: selectedRecord.refNo,
+              buyer_name: selectedRecord.buyerName,
+              transaction_time: selectedRecord.date,
+              total_amount: selectedRecord.amount,
+              paid_amount: selectedRecord.paidAmount,
+              due_amount: 0,
+              payment_status: 'paid',
+              items: [
+                {
+                  id: selectedRecord.id,
+                  product_name: selectedRecord.raw?.notes || 'Udhaar Payment Collection',
+                  quantity: 1,
+                  unit_price: selectedRecord.amount,
+                  total_price: selectedRecord.amount,
+                },
+              ],
+            }}
+            onClose={() => setSelectedRecord(null)}
+            Modal={Modal}
+            Button={Button}
+            money={money}
+          />
+        )
       )}
     </div>
   );
