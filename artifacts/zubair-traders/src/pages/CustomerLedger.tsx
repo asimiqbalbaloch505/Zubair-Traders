@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { FileText, Printer, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Banknote, Store } from 'lucide-react';
 import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
 import { supabase } from '../lib/supabase';
+import { InvoiceModal } from '../components/InvoiceModal';
 
 export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
   const sales = useGetSales();
@@ -519,143 +520,105 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
       )}
 
       {/* Invoice & Payment Receipt Detail Modal (Matching Design Layout) */}
-      {selectedRecord && (
-        <Modal title="" onClose={() => setSelectedRecord(null)}>
-          <div className="space-y-5 text-xs printable-invoice p-1">
-            
-            {/* Header / Eyebrow Title */}
-            <div>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-                {selectedRecord.type === 'INVOICE' ? 'OFFICIAL SALES INVOICE' : 'PAYMENT RECEIPT'}
-              </span>
-              <h3 className="font-mono text-2xl font-black tracking-tight text-foreground">
-                {selectedRecord.type === 'INVOICE' ? 'Invoice' : 'Receipt'} #{String(selectedRecord.refNo).replace(/^(INV|REC)-?/i, '')}
-              </h3>
-            </div>
+      {/* Invoice & Payment Receipt Detail Modal */}
+      {selectedRecord && (
+        selectedRecord.type === 'INVOICE' ? (
+          <InvoiceModal
+            sale={{
+              id: selectedRecord.raw?.id || selectedRecord.id,
+              invoice_number: selectedRecord.refNo,
+              buyer_name: selectedRecord.buyerName,
+              transaction_time: selectedRecord.date,
+              total_amount: selectedRecord.amount,
+              paid_amount: selectedRecord.paidAmount,
+              due_amount: selectedRecord.dueAmount,
+              payment_status: selectedRecord.status,
+              items: selectedRecord.raw?.items || selectedRecord.raw?.sale_items || [],
+            }}
+            onClose={() => setSelectedRecord(null)}
+            money={money}
+            timeDate={timeDate}
+          />
+        ) : (
+          <Modal title="" onClose={() => setSelectedRecord(null)}>
+            <div className="space-y-5 text-xs printable-invoice p-1">
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+                  PAYMENT RECEIPT
+                </span>
+                <h3 className="font-mono text-2xl font-black tracking-tight text-foreground">
+                  Receipt #{String(selectedRecord.refNo).replace(/^REC-?/i, '')}
+                </h3>
+              </div>
 
-            {/* Receipt Card Box */}
-            <div className="rounded-xl border border-border p-5 space-y-4 relative bg-card shadow-sm">
-              
-              {/* Header inside Card */}
-              <div className="flex items-start justify-between border-b border-border pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                    <Store size={20} />
-                  </div>
-                  <div>
-                    <h4 className="text-base font-extrabold uppercase tracking-wide text-foreground">ZUBAIR TRADERS</h4>
-                    <p className="text-[11px] text-muted-foreground">Bakery & General Traders Management</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="inline-block rounded bg-foreground text-background px-2 py-0.5 text-[10px] font-black uppercase tracking-wider">
-                    {selectedRecord.type === 'INVOICE' ? 'TAX INVOICE' : 'PAYMENT INVOICE'}
-                  </span>
-                  <div className="mt-1 font-mono text-xs font-bold text-muted-foreground">
-                    Inv #: {String(selectedRecord.refNo).replace(/^(INV|REC)-?/i, '')}
-                  </div>
-                </div>
-              </div>
+              <div className="rounded-xl border border-border p-5 space-y-4 relative bg-card shadow-sm">
+                <div className="flex items-start justify-between border-b border-border pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                      <Store size={20} />
+                    </div>
+                    <div>
+                      <h4 className="text-base font-extrabold uppercase tracking-wide text-foreground">ZUBAIR TRADERS</h4>
+                      <p className="text-[11px] text-muted-foreground">Bakery & General Traders Management</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="inline-block rounded bg-foreground text-background px-2 py-0.5 text-[10px] font-black uppercase tracking-wider">
+                      PAYMENT RECEIPT
+                    </span>
+                    <div className="mt-1 font-mono text-xs font-bold text-muted-foreground">
+                      Rec #: {String(selectedRecord.refNo).replace(/^REC-?/i, '')}
+                    </div>
+                  </div>
+                </div>
 
-              {/* Customer & Transaction Meta */}
-              <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/40 p-3">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">CUSTOMER NAME</span>
-                  <span className="font-bold text-foreground text-xs leading-snug">
-                    {selectedRecord.buyerName}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">TRANSACTION DATE</span>
-                  <span className="font-bold text-foreground text-xs leading-snug">
-                    {timeDate(selectedRecord.date)}
-                  </span>
-                </div>
-              </div>
+                <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/40 p-3">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">CUSTOMER NAME</span>
+                    <span className="font-bold text-foreground text-xs leading-snug">
+                      {selectedRecord.buyerName}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">TRANSACTION DATE</span>
+                    <span className="font-bold text-foreground text-xs leading-snug">
+                      {timeDate(selectedRecord.date)}
+                    </span>
+                  </div>
+                </div>
 
-              {/* Line Items (Invoice) or Note Breakdown (Payment) */}
-              {selectedRecord.type === 'INVOICE' ? (
-                selectedRecord.raw?.items && selectedRecord.raw.items.length > 0 ? (
-                  <div className="overflow-hidden rounded-lg border border-border">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-muted/60 text-[10px] uppercase font-bold text-muted-foreground border-b border-border">
-                        <tr>
-                          <th className="py-2 px-3">ITEM DESCRIPTION</th>
-                          <th className="py-2 px-2 text-center">QTY</th>
-                          <th className="py-2 px-3 text-right">UNIT PRICE</th>
-                          <th className="py-2 px-3 text-right">TOTAL</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/60">
-                        {selectedRecord.raw.items.map((item: any, idx: number) => (
-                          <tr key={idx}>
-                            <td className="py-2 px-3 font-medium text-foreground">
-                              {item.productName || item.product_name}
-                            </td>
-                            <td className="py-2 px-2 text-center font-mono">{item.quantity}</td>
-                            <td className="py-2 px-3 text-right font-mono text-muted-foreground">
-                              {money(item.unitPrice ?? item.unit_price ?? 0)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono font-extrabold text-foreground">
-                              {money(item.totalPrice ?? item.total_price ?? 0)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
-                    No itemized product details attached.
-                  </div>
-                )
-              ) : (
-                <div className="rounded-lg border border-border p-3 bg-muted/20 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Payment Note / Method</span>
-                  <p className="font-semibold text-foreground text-xs">
-                    {selectedRecord.raw?.notes || 'Direct Cash Collection / Udhaar Payment'}
-                  </p>
-                </div>
-              )}
+                <div className="rounded-lg border border-border p-3 bg-muted/20 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Payment Note / Method</span>
+                  <p className="font-semibold text-foreground text-xs">
+                    {selectedRecord.raw?.notes || 'Direct Cash Collection / Udhaar Payment'}
+                  </p>
+                </div>
 
-              {/* Amount Summaries */}
-              <div className="flex justify-end pt-1">
-                <div className="w-full sm:w-64 space-y-1.5 rounded-lg border border-border/80 bg-muted/20 p-3">
-                  <div className="flex justify-between items-center text-xs font-semibold">
-                    <span className="text-muted-foreground">Total Amount:</span>
-                    <span className="font-mono text-foreground font-bold">{money(selectedRecord.amount)}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs font-semibold text-emerald-600">
-                    <span>Paid Amount:</span>
-                    <span className="font-mono font-bold">{money(selectedRecord.paidAmount)}</span>
-                  </div>
-                  {selectedRecord.type === 'INVOICE' && (
-                    <div className="border-t border-border pt-1.5 flex justify-between items-center text-xs font-bold text-destructive">
-                      <span>Balance Due:</span>
-                      <span className="font-mono text-sm">{money(selectedRecord.dueAmount)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+                <div className="flex justify-end pt-1">
+                  <div className="w-full sm:w-64 space-y-1.5 rounded-lg border border-border/80 bg-muted/20 p-3">
+                    <div className="flex justify-between items-center text-xs font-semibold text-emerald-600">
+                      <span>Received Amount:</span>
+                      <span className="font-mono font-bold">{money(selectedRecord.paidAmount)}</span>
+                    </div>
+                  </div>
+                </div>
 
-              {/* Footer Note inside Receipt */}
-              <div className="text-center pt-2 border-t border-border/60">
-                <p className="font-bold text-xs text-foreground">Thank you for your business!</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Zubair Traders • Authorized Computer Generated Receipt</p>
-              </div>
-            </div>
+                <div className="text-center pt-2 border-t border-border/60">
+                  <p className="font-bold text-xs text-foreground">Thank you for your business!</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Zubair Traders • Authorized Computer Generated Receipt</p>
+                </div>
+              </div>
 
-            {/* Modal Bottom Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2 print:hidden">
-              <Button variant="outline" onClick={() => window.print()} className="gap-1.5">
-                <Printer size={14} /> Print / Save PDF
-              </Button>
-              <Button onClick={() => setSelectedRecord(null)}>Close</Button>
-            </div>
-
-          </div>
-        </Modal>
-      )}
+              <div className="flex items-center justify-end gap-2 pt-2 print:hidden">
+                <Button variant="outline" onClick={() => window.print()} className="gap-1.5">
+                  <Printer size={14} /> Print / Save PDF
+                </Button>
+                <Button onClick={() => setSelectedRecord(null)}>Close</Button>
+              </div>
+            </div>
+          </Modal>
+        )
+      )}
     </div>
   );
 } 
