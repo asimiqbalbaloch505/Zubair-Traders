@@ -31,7 +31,7 @@ export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceMod
 
   return (
     <Modal title={`Invoice #${cleanInvoiceNo}`} eyebrow="Official Sales Invoice" onClose={onClose}>
-      <div className="printable-invoice relative bg-white text-black rounded-lg flex flex-col justify-between">
+      <div className="printable-invoice relative bg-white text-black rounded-lg flex flex-col justify-between p-4">
         
         {/* TOP SECTION */}
         <div>
@@ -160,9 +160,9 @@ export function InvoiceModal({ sale, onClose, Modal, Button, money }: InvoiceMod
           </div>
 
           {/* Non-Printable Action Buttons */}
-          <div className="flex justify-end gap-2 pt-3 print:hidden border-t mt-3">
+          <div className="flex justify-end gap-2 pt-3 print:hidden border-t border-gray-200 mt-3">
             <Button variant="outline" testId="button-modal-print" onClick={handlePrint}>
-              <Printer size={15} /> Print / Save PDF
+              <Printer size={15} className="mr-1 inline" /> Print / Save PDF
             </Button>
             <Button testId="button-modal-close" onClick={onClose}>
               Close
