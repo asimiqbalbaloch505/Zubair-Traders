@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { FileText, Printer, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Banknote, Store } from 'lucide-react';
 import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
 import { supabase } from '../lib/supabase';
-import { InvoiceModal } from '../components/InvoiceModal';
+import { InvoiceModal } from '../components/invoiceModal';
 
 export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empty, money, timeDate }: any) {
   const sales = useGetSales();
