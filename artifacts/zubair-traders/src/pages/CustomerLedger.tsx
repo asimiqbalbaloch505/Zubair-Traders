@@ -153,61 +153,149 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
   }, [filteredSales, filteredPayments]);
 
   // Combined Merged Transactions
-  const transactionsList = useMemo(() => {
-    const invs = filteredSales.map((inv: any) => {
-      const total = Number(inv.totalAmount ?? inv.total_amount ?? 0);
-      const paid = Number(inv.paidAmount ?? inv.paid_amount ?? 0);
-      const statusRaw = String(inv.paymentStatus || inv.payment_status || '').toLowerCase();
+  // Combined Merged Transactions with Cumulative Ledger Balance
+  const transactionsList = useMemo(() => {
+    // 1. Map raw sales
+    const salesList = (sales.data || []).map((s: any) => ({
+      ...s,
+      buyerId: s.buyer_id || s.buyerId,
+      recordType: 'INVOICE',
+      rawDate: new Date(s.created_at || s.transactionTime || s.transaction_time || s.date || 0),
+    }));
 
-      let status = 'unpaid';
-      if (statusRaw === 'paid' || (total > 0 && paid >= total)) {
-        status = 'paid';
-      } else if (statusRaw === 'partial' || statusRaw === 'partially_paid' || paid > 0) {
-        status = 'partial';
-      }
+    // 2. Map raw buyer payments
+    const paymentsList = (payments.data || []).map((p: any) => ({
+      ...p,
+      buyerId: p.buyer_id || p.buyerId,
+      recordType: 'PAYMENT',
+      rawDate: new Date(p.created_at || p.payment_date || p.transactionTime || p.date || 0),
+    }));
 
-      return {
-        id: inv.id,
-        type: 'INVOICE',
-        refNo: inv.invoiceNumber || inv.invoice_number || inv.id,
-        buyerName: inv.buyerName || inv.buyer_name || 'Walk-in Buyer',
-        date: inv.created_at || inv.transactionTime || inv.transaction_time,
-        amount: total,
-        paidAmount: paid,
-        dueAmount: Math.max(0, total - paid),
-        status,
-        raw: inv,
-      };
-    });
+    // 3. Group by customer to calculate running ledger balances chronologically
+    const buyerLedgers: { [buyerId: string]: any[] } = {};
+    [...salesList, ...paymentsList].forEach((rec) => {
+      const bId = String(rec.buyerId || '');
+      if (bId) {
+        if (!buyerLedgers[bId]) buyerLedgers[bId] = [];
+        buyerLedgers[bId].push(rec);
+      }
+    });
 
-    const pmts = filteredPayments.map((pmt: any) => ({
-      id: pmt.id,
-      type: 'PAYMENT',
-      refNo: pmt.id ? `REC-${pmt.id}` : 'RECEIPT',
-      buyerName: pmt.buyers?.name || pmt.buyer_name || activeBuyer?.name || 'Customer',
-      date: pmt.created_at || pmt.payment_date || pmt.transactionTime,
-      amount: Number(pmt.amount ?? pmt.paid_amount ?? 0),
-      paidAmount: Number(pmt.amount ?? pmt.paid_amount ?? 0),
-      dueAmount: 0,
-      status: 'paid',
-      raw: pmt,
-    }));
+    const calculatedRecordsMap = new Map<string, any>();
 
-    const merged = [...invs, ...pmts].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    Object.keys(buyerLedgers).forEach((bId) => {
+      const history = buyerLedgers[bId].sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime());
+      let runningBalance = 0;
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return merged.filter(
-        (item) =>
-          String(item.refNo).toLowerCase().includes(q) ||
-          String(item.buyerName).toLowerCase().includes(q)
-      );
-    }
+      history.forEach((item) => {
+        const itemDateStr = item.created_at || item.payment_date || item.transactionTime || item.transaction_time;
+        
+        if (item.recordType === 'INVOICE') {
+          const total = Number(item.totalAmount ?? item.total_amount ?? 0);
+          const paid = Number(item.paidAmount ?? item.paid_amount ?? 0);
+          const unpaid = Math.max(0, total - paid);
+          runningBalance += unpaid;
 
-    return merged;
-  }, [filteredSales, filteredPayments, activeBuyer, searchQuery]);
+          const statusRaw = String(item.paymentStatus || item.payment_status || '').toLowerCase();
+          let status = 'unpaid';
+          if (statusRaw === 'paid' || (total > 0 && paid >= total)) {
+            status = 'paid';
+          } else if (statusRaw === 'partial' || statusRaw === 'partially_paid' || paid > 0) {
+            status = 'partial';
+          }
+
+          calculatedRecordsMap.set(`INVOICE-${item.id}`, {
+            id: item.id,
+            type: 'INVOICE',
+            refNo: item.invoiceNumber || item.invoice_number || item.id,
+            buyerName: item.buyerName || item.buyer_name || activeBuyer?.name || 'Walk-in Buyer',
+            buyerId: bId,
+            date: itemDateStr,
+            amount: total,
+            paidAmount: paid,
+            dueAmount: unpaid,
+            runningBalance,
+            status,
+            raw: item,
+          });
+        } else if (item.recordType === 'PAYMENT') {
+          const previousBalance = runningBalance;
+          const paidNow = Number(item.amount ?? item.paid_amount ?? 0);
+          runningBalance = Math.max(0, runningBalance - paidNow);
+
+          calculatedRecordsMap.set(`PAYMENT-${item.id}`, {
+            id: item.id,
+            type: 'PAYMENT',
+            refNo: item.id ? `REC-${item.id}` : 'RECEIPT',
+            buyerName: item.buyers?.name || item.buyer_name || activeBuyer?.name || 'Customer',
+            buyerId: bId,
+            date: itemDateStr,
+            amount: previousBalance, // Shows Previous Balance
+            paidAmount: paidNow,     // Amount Paid Now
+            dueAmount: runningBalance, // Remaining Due
+            runningBalance,
+            status: runningBalance === 0 ? 'paid' : 'partial',
+            raw: item,
+          });
+        }
+      });
+    });
+
+    // 4. Combine filtered list and assign running calculation details
+    const invs = filteredSales.map((inv: any) => {
+      const calc = calculatedRecordsMap.get(`INVOICE-${inv.id}`);
+      if (calc) return calc;
+
+      const total = Number(inv.totalAmount ?? inv.total_amount ?? 0);
+      const paid = Number(inv.paidAmount ?? inv.paid_amount ?? 0);
+      return {
+        id: inv.id,
+        type: 'INVOICE',
+        refNo: inv.invoiceNumber || inv.invoice_number || inv.id,
+        buyerName: inv.buyerName || inv.buyer_name || 'Walk-in Buyer',
+        date: inv.created_at || inv.transactionTime || inv.transaction_time,
+        amount: total,
+        paidAmount: paid,
+        dueAmount: Math.max(0, total - paid),
+        status: paid >= total ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
+        raw: inv,
+      };
+    });
+
+    const pmts = filteredPayments.map((pmt: any) => {
+      const calc = calculatedRecordsMap.get(`PAYMENT-${pmt.id}`);
+      if (calc) return calc;
+
+      const paid = Number(pmt.amount ?? pmt.paid_amount ?? 0);
+      return {
+        id: pmt.id,
+        type: 'PAYMENT',
+        refNo: pmt.id ? `REC-${pmt.id}` : 'RECEIPT',
+        buyerName: pmt.buyers?.name || pmt.buyer_name || activeBuyer?.name || 'Customer',
+        date: pmt.created_at || pmt.payment_date || pmt.transactionTime,
+        amount: paid,
+        paidAmount: paid,
+        dueAmount: 0,
+        status: 'paid',
+        raw: pmt,
+      };
+    });
+
+    const merged = [...invs, ...pmts].sort(
+      (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
+    );
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return merged.filter(
+        (item) =>
+          String(item.refNo).toLowerCase().includes(q) ||
+          String(item.buyerName).toLowerCase().includes(q)
+      );
+    }
+
+    return merged;
+  }, [sales.data, payments.data, filteredSales, filteredPayments, activeBuyer, searchQuery]);
 
   // Open Receive Payment Modal
   const handleOpenReceivePayment = () => {
@@ -521,52 +609,41 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
 
       
       {/* Invoice & Payment Receipt Detail Modal */}
+      {/* Invoice & Payment Receipt Detail Modal */}
       {selectedRecord && (
-        selectedRecord.type === 'INVOICE' ? (
-          <InvoiceModal
-            sale={{
-              id: selectedRecord.raw?.id || selectedRecord.id,
-              invoice_number: selectedRecord.refNo,
-              buyer_name: selectedRecord.buyerName,
-              transaction_time: selectedRecord.date,
-              total_amount: selectedRecord.amount,
-              paid_amount: selectedRecord.paidAmount,
-              due_amount: selectedRecord.dueAmount,
-              payment_status: selectedRecord.status,
-              items: selectedRecord.raw?.items || selectedRecord.raw?.sale_items || [],
-            }}
-            onClose={() => setSelectedRecord(null)}
-            Modal={Modal}
-            Button={Button}
-            money={money}
-          />
-        ) : (
-          <InvoiceModal
-            sale={{
-              id: selectedRecord.raw?.id || selectedRecord.id,
-              invoice_number: selectedRecord.refNo,
-              buyer_name: selectedRecord.buyerName,
-              transaction_time: selectedRecord.date,
-              total_amount: selectedRecord.amount,
-              paid_amount: selectedRecord.paidAmount,
-              due_amount: 0,
-              payment_status: 'paid',
-              items: [
-                {
-                  id: selectedRecord.id,
-                  product_name: selectedRecord.raw?.notes || 'Udhaar Payment Collection',
-                  quantity: 1,
-                  unit_price: selectedRecord.amount,
-                  total_price: selectedRecord.amount,
-                },
-              ],
-            }}
-            onClose={() => setSelectedRecord(null)}
-            Modal={Modal}
-            Button={Button}
-            money={money}
-          />
-        )
+        <InvoiceModal
+          sale={{
+            ...selectedRecord.raw,
+            id: selectedRecord.raw?.id || selectedRecord.id,
+            recordType: selectedRecord.type === 'INVOICE' ? 'sales' : 'udhaar',
+            type: selectedRecord.type === 'INVOICE' ? 'sales' : 'udhaar',
+            invoice_number: selectedRecord.refNo,
+            buyer_name: selectedRecord.buyerName,
+            created_at: selectedRecord.date,
+            transactionTime: selectedRecord.date,
+            transaction_time: selectedRecord.date,
+            total_amount: selectedRecord.amount,
+            paid_amount: selectedRecord.paidAmount,
+            due_amount: selectedRecord.dueAmount,
+            payment_status: selectedRecord.status,
+            items:
+              selectedRecord.type === 'INVOICE'
+                ? selectedRecord.raw?.items || selectedRecord.raw?.sale_items || []
+                : [
+                    {
+                      id: selectedRecord.id,
+                      product_name: selectedRecord.raw?.notes || 'Udhaar Payment Collection',
+                      quantity: 1,
+                      unit_price: selectedRecord.paidAmount,
+                      total_price: selectedRecord.paidAmount,
+                    },
+                  ],
+          }}
+          onClose={() => setSelectedRecord(null)}
+          Modal={Modal}
+          Button={Button}
+          money={money}
+        />
       )}
     </div>
   );
