@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { FileText, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Banknote } from 'lucide-react';
+import { FileText, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Banknote, ShoppingBag } from 'lucide-react';
 import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
 import { supabase } from '../lib/supabase';
 import { InvoiceModal } from '../components/invoiceModal';
@@ -289,21 +289,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     return merged;
   }, [sales.data, payments.data, filteredSales, filteredPayments, activeBuyer, searchQuery]);
 
-  // Calculate table totals dynamically from active list
-  const tableTotals = useMemo(() => {
-    return transactionsList.reduce(
-      (acc, tx) => {
-        if (tx.type === 'INVOICE') {
-          acc.totalSales += Number(tx.amount || 0);
-        }
-        acc.totalPaid += Number(tx.paidAmount || 0);
-        acc.totalDue += Number(tx.dueAmount || 0);
-        return acc;
-      },
-      { totalSales: 0, totalPaid: 0, totalDue: 0 }
-    );
-  }, [transactionsList]);
-
   const handleOpenReceivePayment = () => {
     if (!activeBuyer) return;
     setReceiveAmount(String(activeBuyer.totalUdhaar || ''));
@@ -338,6 +323,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     }
   };
 
+  // Helper to render items preview string cleanly
   const renderItemsPreview = (tx: any) => {
     if (tx.type === 'PAYMENT') {
       return (
@@ -516,6 +502,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                   <th className="pb-3">Total Amount</th>
                   <th className="pb-3">Paid / Received</th>
                   <th className="pb-3">Due / Balance</th>
+                  <th className="pb-3">Status</th>
                   <th className="pb-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -533,7 +520,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                     <td className="py-3 text-xs">
                       {tx.type === 'INVOICE' ? (
                         <span className="inline-flex items-center gap-1 rounded bg-blue-100 px-2 py-0.5 text-blue-800 font-semibold text-[11px]">
-                          <ArrowUpRight size={12} /> Sale
+                          <ArrowUpRight size={12} /> Invoice
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-emerald-800 font-semibold text-[11px]">
@@ -556,6 +543,19 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                         <span className="text-muted-foreground">PKR 0</span>
                       )}
                     </td>
+                    <td className="py-3">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                          tx.status === 'paid'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : tx.status === 'partial'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {tx.status}
+                      </span>
+                    </td>
                     <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => setSelectedRecord(tx)}
@@ -567,23 +567,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="border-t-2 border-border bg-muted/20 font-semibold">
-                <tr>
-                  <td colSpan={5} className="py-3.5 text-xs text-right font-bold uppercase tracking-wider pr-4">
-                    Totals:
-                  </td>
-                  <td className="py-3.5 font-mono text-xs font-bold text-foreground">
-                    {money(tableTotals.totalSales)}
-                  </td>
-                  <td className="py-3.5 font-mono text-xs font-bold text-emerald-600">
-                    {money(tableTotals.totalPaid)}
-                  </td>
-                  <td className="py-3.5 font-mono text-xs font-bold text-destructive">
-                    {money(tableTotals.totalDue)}
-                  </td>
-                  <td></td>
-                </tr>
-              </tfoot>
             </table>
           ) : (
             <Empty title="No records found" detail="No transactions match your current search and date parameters." />
