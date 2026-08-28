@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { FileText, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Banknote, ShoppingBag } from 'lucide-react';
+import { FileText, Search, Calendar, X, ArrowDownRight, ArrowUpRight, Banknote } from 'lucide-react';
 import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
 import { supabase } from '../lib/supabase';
 import { InvoiceModal } from '../components/invoiceModal';
@@ -323,7 +323,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     }
   };
 
-  // Helper to render items preview string cleanly
   const renderItemsPreview = (tx: any) => {
     if (tx.type === 'PAYMENT') {
       return (
@@ -502,7 +501,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                   <th className="pb-3">Total Amount</th>
                   <th className="pb-3">Paid / Received</th>
                   <th className="pb-3">Due / Balance</th>
-                  <th className="pb-3">Status</th>
                   <th className="pb-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -520,7 +518,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                     <td className="py-3 text-xs">
                       {tx.type === 'INVOICE' ? (
                         <span className="inline-flex items-center gap-1 rounded bg-blue-100 px-2 py-0.5 text-blue-800 font-semibold text-[11px]">
-                          <ArrowUpRight size={12} /> Invoice
+                          <ArrowUpRight size={12} /> Sale
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-emerald-800 font-semibold text-[11px]">
@@ -542,19 +540,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                       ) : (
                         <span className="text-muted-foreground">PKR 0</span>
                       )}
-                    </td>
-                    <td className="py-3">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                          tx.status === 'paid'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : tx.status === 'partial'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {tx.status}
-                      </span>
                     </td>
                     <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
