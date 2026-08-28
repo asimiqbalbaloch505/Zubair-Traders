@@ -29,13 +29,17 @@ export function Invoices({ PageIntro, Button, Modal, InvoiceModal, Loading, Fail
   const isError = sales.isError || buyerPayments.isError || purchases.isError;
 
   const combinedRecords = useMemo(() => {
+    // 1. Map Sales
     const salesList = (sales.data || []).map((s: any) => ({
       ...s,
+      buyerId: s.buyer_id || s.buyerId,
       uniqueKey: `sale-${s.id}`,
       recordType: 'sales',
       displayType: 'Sales',
+      rawDate: new Date(s.created_at || s.transactionTime || s.transaction_time || s.date || 0),
     }));
 
+    // 2. Map Udhaar Payments
     const udhaarList = (buyerPayments.data || []).map((p: any) => {
       const customerName = p.buyers?.name || 'Walk-in Customer';
       const recNo = p.id ? `REC-${p.id}` : 'REC-PAYMENT';
@@ -44,6 +48,7 @@ export function Invoices({ PageIntro, Button, Modal, InvoiceModal, Loading, Fail
 
       return {
         ...p,
+        buyerId: p.buyer_id || p.buyerId,
         uniqueKey: `udhaar-${p.id}`,
         invoiceNumber: recNo,
         invoice_number: recNo,
@@ -51,29 +56,24 @@ export function Invoices({ PageIntro, Button, Modal, InvoiceModal, Loading, Fail
         buyer_name: customerName,
         created_at: recordDate,
         transactionTime: recordDate,
-        totalAmount: amount,
-        total_amount: amount,
-        paidAmount: amount,
-        paid_amount: amount,
-        dueAmount: 0,
-        due_amount: 0,
-        paymentStatus: 'paid',
-        payment_status: 'paid',
+        amountCollected: amount,
         paymentMethod: p.payment_method || 'Cash',
         notes: p.notes || 'Udhaar Payment Collected',
         recordType: 'udhaar',
         displayType: 'Udhaar Payment',
         items: [],
+        rawDate: new Date(recordDate || 0),
       };
     });
 
+    // 3. Map Purchases
     const purchaseList = (purchases.data || []).map((pur: any) => {
       const supplierName = pur.supplierName || pur.suppliers?.name || pur.supplier_name || 'Walk-in / Cash Purchase';
       const purNo = pur.purchaseNumber || pur.purchase_number 
-  ? `PUR-${pur.purchase_number || pur.purchaseNumber}` 
-  : pur.id 
-  ? `PUR-${pur.id}` 
-  : 'PUR-INV';
+        ? `PUR-${pur.purchase_number || pur.purchaseNumber}` 
+        : pur.id 
+        ? `PUR-${pur.id}` 
+        : 'PUR-INV';
       const recordDate = pur.created_at || pur.transaction_time || pur.transactionTime || pur.date;
 
       return {
@@ -96,14 +96,47 @@ export function Invoices({ PageIntro, Button, Modal, InvoiceModal, Loading, Fail
         recordType: 'purchase',
         displayType: 'Purchase',
         items: pur.items || pur.purchase_invoice_items || [],
+        rawDate: new Date(recordDate || 0),
       };
     });
 
-    return [...salesList, ...udhaarList, ...purchaseList].sort((a, b) => {
-      const dateA = new Date(a.created_at || a.transactionTime || a.transaction_time || a.date || 0).getTime();
-      const dateB = new Date(b.created_at || b.transactionTime || b.transaction_time || b.date || 0).getTime();
-      return dateB - dateA;
+    // 4. Group buyer records (sales + udhaar payments) to calculate accurate running ledger balances
+    const buyerLedgers: { [buyerId: string]: any[] } = {};
+    [...salesList, ...udhaarList].forEach(rec => {
+      if (rec.buyerId) {
+        if (!buyerLedgers[rec.buyerId]) buyerLedgers[rec.buyerId] = [];
+        buyerLedgers[rec.buyerId].push(rec);
+      }
     });
+
+    // 5. Calculate running balance per buyer (oldest to newest)
+    Object.keys(buyerLedgers).forEach(bId => {
+      const history = buyerLedgers[bId].sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime());
+      let runningBalance = 0;
+
+      history.forEach(item => {
+        if (item.recordType === 'sales') {
+          const unpaid = Number(item.dueAmount ?? item.due_amount ?? ((item.totalAmount || 0) - (item.paidAmount || 0)));
+          runningBalance += unpaid;
+        } else if (item.recordType === 'udhaar') {
+          const previousBalance = runningBalance;
+          const paidNow = Number(item.amountCollected || 0);
+          runningBalance = Math.max(0, runningBalance - paidNow);
+
+          item.totalAmount = previousBalance;
+          item.total_amount = previousBalance;
+          item.paidAmount = paidNow;
+          item.paid_amount = paidNow;
+          item.dueAmount = runningBalance;
+          item.due_amount = runningBalance;
+          item.paymentStatus = runningBalance === 0 ? 'paid' : 'partial';
+          item.payment_status = runningBalance === 0 ? 'paid' : 'partial';
+        }
+      });
+    });
+
+    // 6. Return all records sorted newest to oldest
+    return [...salesList, ...udhaarList, ...purchaseList].sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime());
   }, [sales.data, buyerPayments.data, purchases.data]);
 
   const filteredInvoices = useMemo(() => {
@@ -304,27 +337,20 @@ const cleanNum = String(invNo).replace(/^(INV|PUR|REC)-?/i, '');
       {selectedInvoice && (
         <InvoiceModal
           sale={{
+            ...selectedInvoice,
             id: selectedInvoice.id,
+            recordType: selectedInvoice.recordType,
+            type: selectedInvoice.recordType,
             invoice_number: selectedInvoice.invoiceNumber || selectedInvoice.invoice_number || selectedInvoice.purchaseNumber || selectedInvoice.id,
             buyer_name: selectedInvoice.buyerName || selectedInvoice.buyer_name || 'Walk-in Customer',
+            supplier_name: selectedInvoice.supplierName || selectedInvoice.supplier_name,
             created_at: selectedInvoice.created_at || selectedInvoice.transactionTime || selectedInvoice.transaction_time || selectedInvoice.date,
+            transactionTime: selectedInvoice.created_at || selectedInvoice.transactionTime || selectedInvoice.transaction_time || selectedInvoice.date,
             total_amount: selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0,
             paid_amount: selectedInvoice.paidAmount ?? selectedInvoice.paid_amount ?? 0,
             due_amount: selectedInvoice.dueAmount ?? selectedInvoice.due_amount ?? 0,
             payment_status: selectedInvoice.paymentStatus || selectedInvoice.payment_status || 'paid',
-            items: selectedInvoice.items && selectedInvoice.items.length > 0 
-              ? selectedInvoice.items 
-              : selectedInvoice.recordType === 'udhaar'
-              ? [
-                  {
-                    id: selectedInvoice.id,
-                    product_name: selectedInvoice.notes || 'Udhaar Payment Collection',
-                    quantity: 1,
-                    unit_price: selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0,
-                    total_price: selectedInvoice.totalAmount ?? selectedInvoice.total_amount ?? 0,
-                  },
-                ]
-              : [],
+            items: selectedInvoice.items || [],
           }}
           onClose={() => setSelectedInvoice(null)}
           Modal={Modal}
