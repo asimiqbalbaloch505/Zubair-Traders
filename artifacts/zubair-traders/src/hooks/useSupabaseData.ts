@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-
 export function useGetDashboard(filter: string = 'this_month', customMonth?: string, _options?: any) {
   return useQuery({
     queryKey: ['dashboard', filter, customMonth],
@@ -842,6 +841,20 @@ export function useHealthCheck(_options?: any) {
       const { error } = await supabase.from('buyers').select('id').limit(1);
       if (error) throw error;
       return { status: 'ok' };
+    },
+  });
+}
+
+export function useGetSupplierPayments() {
+  return useQuery({
+    queryKey: ['supplier_payments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('supplier_payments')
+        .select('*, suppliers(name)');
+
+      if (error) throw error;
+      return data || [];
     },
   });
 }
