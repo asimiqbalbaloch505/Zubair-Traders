@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { FileText, Search, ArrowDownRight, ArrowUpRight, Banknote, Calculator } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { FileText, Search, ArrowDownRight, ArrowUpRight, Banknote, User } from 'lucide-react';
 import { useGetSales, useGetBuyers, useGetBuyerPayments } from '../hooks/useSupabaseData';
 import { supabase } from '../lib/supabase';
 import { InvoiceModal } from '../components/invoiceModal';
@@ -12,12 +12,18 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
   const [selectedBuyerId, setSelectedBuyerId] = useState<string>('');
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isCalculated, setIsCalculated] = useState(false);
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [receiveAmount, setReceiveAmount] = useState<string>('');
   const [paymentNotes, setPaymentNotes] = useState<string>('');
+
+  // Automatically select the first customer from the list if none is selected
+  useEffect(() => {
+    if (buyers.data && buyers.data.length > 0 && !selectedBuyerId) {
+      setSelectedBuyerId(String(buyers.data[0].id));
+    }
+  }, [buyers.data, selectedBuyerId]);
 
   // Calculate Base Ledger Metrics per Buyer
   const buyerLedgerData = useMemo(() => {
@@ -76,10 +82,12 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     return buyerLedgerData.find((b: any) => String(b.id) === String(selectedBuyerId)) || null;
   }, [buyerLedgerData, selectedBuyerId]);
 
-  // Chronological List (Oldest at top -> Latest at bottom)
+  // Chronological List (Oldest at top -> Latest at bottom) for selected customer
   const transactionsList = useMemo(() => {
-    const rawSales = activeBuyer ? activeBuyer.invoices : (sales.data || []);
-    const rawPayments = activeBuyer ? activeBuyer.payments : (payments.data || []);
+    if (!activeBuyer) return [];
+
+    const rawSales = activeBuyer.invoices || [];
+    const rawPayments = activeBuyer.payments || [];
 
     const salesList = rawSales.map((s: any) => {
       const total = Number(s.totalAmount ?? s.total_amount ?? 0);
@@ -90,7 +98,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         id: s.id,
         type: 'INVOICE',
         refNo: s.invoiceNumber || s.invoice_number || s.id,
-        buyerName: s.buyerName || s.buyer_name || activeBuyer?.name || 'Walk-in Buyer',
+        buyerName: activeBuyer.name,
         date: s.created_at || s.transactionTime || s.transaction_time,
         rawDate: new Date(s.created_at || s.transactionTime || s.transaction_time || 0).getTime(),
         amount: total,
@@ -107,7 +115,7 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
         id: p.id,
         type: 'PAYMENT',
         refNo: p.id ? `REC-${p.id}` : 'RECEIPT',
-        buyerName: p.buyers?.name || p.buyer_name || activeBuyer?.name || 'Customer',
+        buyerName: activeBuyer.name,
         date: p.created_at || p.payment_date || p.transactionTime,
         rawDate: new Date(p.created_at || p.payment_date || p.transactionTime || 0).getTime(),
         amount: 0,
@@ -123,17 +131,13 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      return merged.filter(
-        (item) =>
-          String(item.refNo).toLowerCase().includes(q) ||
-          String(item.buyerName).toLowerCase().includes(q)
-      );
+      return merged.filter((item) => String(item.refNo).toLowerCase().includes(q));
     }
 
     return merged;
-  }, [sales.data, payments.data, activeBuyer, searchQuery]);
+  }, [activeBuyer, searchQuery]);
 
-  // Dynamic ledger totals for calculated row
+  // Automatic calculation of totals at the end of Khata
   const tableTotals = useMemo(() => {
     const totalSales = transactionsList.reduce(
       (acc, tx) => acc + (tx.type === 'INVOICE' ? Number(tx.amount || 0) : 0),
@@ -145,28 +149,22 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     return { totalSales, totalPaid, totalDue };
   }, [transactionsList]);
 
-  const handleBuyerChange = (bId: string) => {
-    setSelectedBuyerId(bId);
-    setIsCalculated(false); // Reset calculation on customer switch
-  };
-
   const handleOpenReceivePayment = () => {
-    const defaultUdhaar = activeBuyer ? activeBuyer.totalUdhaar : tableTotals.totalDue;
-    setReceiveAmount(String(defaultUdhaar || ''));
+    if (!activeBuyer) return;
+    setReceiveAmount(String(tableTotals.totalDue || ''));
     setPaymentNotes('');
     setIsPaymentModalOpen(true);
   };
 
   const handleReceivePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!receiveAmount || Number(receiveAmount) <= 0) return;
+    if (!activeBuyer || !receiveAmount || Number(receiveAmount) <= 0) return;
 
     setIsSubmittingPayment(true);
     try {
-      const targetBuyerId = activeBuyer?.id || selectedBuyerId;
       const { error } = await supabase.from('buyer_payments').insert([
         {
-          buyer_id: targetBuyerId || null,
+          buyer_id: activeBuyer.id,
           amount: Number(receiveAmount),
           notes: paymentNotes,
           created_at: new Date().toISOString(),
@@ -178,7 +176,6 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
       if (payments.refetch) payments.refetch();
       if (sales.refetch) sales.refetch();
       setIsPaymentModalOpen(false);
-      setIsCalculated(true); // Keep totals active to view updated balance
     } catch (err) {
       console.error('Failed to submit payment:', err);
     } finally {
@@ -224,44 +221,57 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
     <div className="animate-in space-y-6">
       <PageIntro
         eyebrow="Financial Records"
-        title="Customers Khata"
-        detail="Notebook style entry tracking transactions chronologically from top to bottom."
+        title="Customer Khata Ledger"
+        detail="Notebook style entry tracking individual customer balance chronologically."
       />
 
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div className="w-full sm:w-80">
-          <label className="block text-xs font-semibold text-muted-foreground mb-1">
-            Select Customer
-          </label>
-          <select
-            value={selectedBuyerId}
-            onChange={(e) => handleBuyerChange(e.target.value)}
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-xs outline-none focus:border-primary font-medium"
-          >
-            <option value="">All Customers</option>
-            {buyerLedgerData.map((b: any) => (
-              <option key={b.id} value={b.id}>
-                {b.name} {b.phone ? `(${b.phone})` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setIsCalculated(true)}
-          className="h-10 px-4 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition flex items-center justify-center gap-2 shadow-sm"
+      <div className="w-full sm:w-80">
+        <label className="block text-xs font-semibold text-muted-foreground mb-1">
+          Select Customer
+        </label>
+        <select
+          value={selectedBuyerId}
+          onChange={(e) => setSelectedBuyerId(e.target.value)}
+          className="h-10 w-full rounded-lg border border-input bg-background px-3 text-xs outline-none focus:border-primary font-medium"
         >
-          <Calculator size={15} /> Calculate Khata
-        </button>
+          {buyerLedgerData.map((b: any) => (
+            <option key={b.id} value={b.id}>
+              {b.name} {b.phone ? `(${b.phone})` : ''}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="panel rounded-xl border border-border/80 p-5 space-y-4">
+        {activeBuyer && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-border gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                <User size={18} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-foreground">{activeBuyer.name}</h2>
+                {activeBuyer.phone && (
+                  <p className="text-xs text-muted-foreground">{activeBuyer.phone}</p>
+                )}
+              </div>
+            </div>
+            <div className="text-left sm:text-right">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                Current Udhaar Balance
+              </span>
+              <span className="font-mono text-lg font-bold text-destructive">
+                {money(tableTotals.totalDue)}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="relative max-w-xs">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search invoice # or customer..."
+            placeholder="Search invoice #..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none focus:border-primary"
@@ -335,46 +345,44 @@ export function CustomerLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
                 ))}
               </tbody>
 
-              {isCalculated && (
-                <tfoot className="border-t-2 border-border bg-muted/20 font-semibold">
-                  <tr>
-                    <td colSpan={5} className="py-4 text-xs text-right font-bold uppercase tracking-wider pr-4">
-                      Total Calculated Khata:
-                    </td>
-                    <td className="py-4 font-mono text-xs font-bold text-foreground">
-                      {money(tableTotals.totalSales)}
-                    </td>
-                    <td className="py-4 font-mono text-xs font-bold text-emerald-600">
-                      {money(tableTotals.totalPaid)}
-                    </td>
-                    <td className="py-4 font-mono text-xs font-bold text-destructive">
-                      {money(tableTotals.totalDue)}
-                    </td>
-                    <td className="py-4 text-right">
-                      {tableTotals.totalDue > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleOpenReceivePayment}
-                          className="py-1.5 px-3 rounded-lg bg-destructive text-destructive-foreground font-semibold text-xs hover:bg-destructive/90 transition inline-flex items-center gap-1.5 shadow-sm"
-                        >
-                          <Banknote size={14} /> Receive Udhaar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
+              <tfoot className="border-t-2 border-border bg-muted/20 font-semibold">
+                <tr>
+                  <td colSpan={5} className="py-4 text-xs text-right font-bold uppercase tracking-wider pr-4">
+                    Total Khata Summary:
+                  </td>
+                  <td className="py-4 font-mono text-xs font-bold text-foreground">
+                    {money(tableTotals.totalSales)}
+                  </td>
+                  <td className="py-4 font-mono text-xs font-bold text-emerald-600">
+                    {money(tableTotals.totalPaid)}
+                  </td>
+                  <td className="py-4 font-mono text-xs font-bold text-destructive">
+                    {money(tableTotals.totalDue)}
+                  </td>
+                  <td className="py-4 text-right">
+                    {tableTotals.totalDue > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleOpenReceivePayment}
+                        className="py-1.5 px-3 rounded-lg bg-destructive text-destructive-foreground font-semibold text-xs hover:bg-destructive/90 transition inline-flex items-center gap-1.5 shadow-sm"
+                      >
+                        <Banknote size={14} /> Receive Udhaar
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           ) : (
-            <Empty title="No records found" detail="No transactions found for this selection." />
+            <Empty title="No customer record selected" detail="Select a customer from the dropdown above to view their Khata." />
           )}
         </div>
       </div>
 
-      {isPaymentModalOpen && (
+      {isPaymentModalOpen && activeBuyer && (
         <Modal
           title={`Receive Udhaar Payment`}
-          eyebrow={activeBuyer ? activeBuyer.name : 'Customer Khata'}
+          eyebrow={activeBuyer.name}
           onClose={() => setIsPaymentModalOpen(false)}
         >
           <form onSubmit={handleReceivePaymentSubmit} className="space-y-4 text-xs">
