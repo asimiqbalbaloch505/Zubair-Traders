@@ -4,8 +4,8 @@ import { InvoiceModal } from './components/invoiceModal';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { 
   ShoppingCart, Users, Package, Truck, Wallet, 
-  HandCoins, BarChart2, LayoutDashboard, Loader2, AlertCircle, Inbox, X,
-  FileText, BookOpen, LogOut
+  BarChart2, LayoutDashboard, Loader2, AlertCircle, Inbox, X,
+  FileText, BookOpen, LogOut, Receipt
 } from 'lucide-react';
 
 import { Sales } from './pages/Sales';
@@ -16,11 +16,11 @@ import { Expenses } from './pages/Expenses';
 import { Invoices } from './pages/Invoices';
 import { Dashboard } from './pages/Dashboard';
 import { CustomerLedger } from './pages/CustomerLedger';
+import { SupplierLedger } from './pages/SupplierLedger';
 import { Hero } from './pages/Hero';
 import { Login } from './pages/Login';
 
-// Optional: import your existing supabase client
-import { supabase } from './lib/supabase'; // Adjust path if needed
+import { supabase } from './lib/supabase';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -117,8 +117,8 @@ function Field({ label, name, type = 'text', value, onChange, required, placehol
     </label>
   );
 }
+
 function Modal({ title, eyebrow, onClose, children }: any) {
-  // 2. Wrap the JSX in createPortal
   return createPortal(
     <div 
       role="dialog" 
@@ -137,7 +137,7 @@ function Modal({ title, eyebrow, onClose, children }: any) {
         {children}
       </div>
     </div>,
-    document.body // 3. Teleport directly to body
+    document.body
   );
 }
 
@@ -177,10 +177,7 @@ function Empty({ title, detail, action }: any) {
 }
 
 function MainApp() {
-  // App view flow: 'hero' -> 'login' -> 'app'
   const [view, setView] = useState<'hero' | 'login' | 'app'>('hero');
-  
-  // Default to 'sales' tab upon authenticating
   const [activeTab, setActiveTab] = useState<string>('sales');
   const [selectedLedgerBuyerId, setSelectedLedgerBuyerId] = useState<string | null>(null);
 
@@ -189,9 +186,10 @@ function MainApp() {
     { id: 'sales', label: 'Sales', icon: ShoppingCart },
     { id: 'invoices', label: 'Records', icon: FileText },
     { id: 'buyers', label: 'Customers', icon: Users },
-    { id: 'ledger', label: ' Customer Khata', icon: BookOpen },
+    { id: 'ledger', label: 'Customer Khata', icon: BookOpen },
     { id: 'products', label: 'Stock', icon: Package },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
+    { id: 'supplier_ledger', label: 'Supplier Khata', icon: Receipt },
     { id: 'expenses', label: 'Expenses', icon: Wallet },
   ];
 
@@ -218,12 +216,10 @@ function MainApp() {
     onNavigateToLedger: navigateToLedger,
   };
 
-  // Render Hero Page
   if (view === 'hero') {
     return <Hero onGetStarted={() => setView('login')} />;
   }
 
-  // Render Login Screen
   if (view === 'login') {
     return (
       <Login
@@ -236,7 +232,6 @@ function MainApp() {
     );
   }
 
-  // Render Main Application
   return (
     <div className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
       <header className="sticky top-0 z-40 border-b border-border/80 bg-background/95 backdrop-blur-md">
@@ -320,6 +315,7 @@ function MainApp() {
         )}
         {activeTab === 'products' && <Products {...commonProps} />}
         {activeTab === 'suppliers' && <Suppliers {...commonProps} />}
+        {activeTab === 'supplier_ledger' && <SupplierLedger {...commonProps} />}
         {activeTab === 'expenses' && <Expenses {...commonProps} />}
       </main>
     </div>
