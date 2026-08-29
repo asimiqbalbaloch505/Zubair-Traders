@@ -189,7 +189,7 @@ function MainApp() {
     { id: 'sales', label: 'Sales', icon: ShoppingCart },
     { id: 'invoices', label: 'Records', icon: FileText },
     { id: 'buyers', label: 'Customers', icon: Users },
-    { id: 'ledger', label: 'Khata', icon: BookOpen },
+    { id: 'ledger', label: ' Customer Khata', icon: BookOpen },
     { id: 'products', label: 'Stock', icon: Package },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
     { id: 'expenses', label: 'Expenses', icon: Wallet },
