@@ -187,7 +187,7 @@ function MainApp() {
     { id: 'invoices', label: 'Records', icon: FileText },
     { id: 'buyers', label: 'Customers', icon: Users },
     { id: 'ledger', label: 'Customer Khata', icon: BookOpen },
-    { id: 'products', label: 'Stock', icon: Package },
+    { id: 'products', label: 'Manage Stock', icon: Package },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
     { id: 'supplier_ledger', label: 'Supplier Khata', icon: Receipt },
     { id: 'expenses', label: 'Expenses', icon: Wallet },
