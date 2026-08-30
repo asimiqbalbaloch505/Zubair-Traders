@@ -253,7 +253,7 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
                         onClick={() => openRestockForProduct(p)}
                         testId={`button-restock-${p.id}`}
                       >
-                        <RefreshCw size={13} className="mr-1 inline" /> Restock
+                        <RefreshCw size={13} className="mr-1 inline" /> Purchase New Stock
                       </Button>
                     </td>
                   </tr>
