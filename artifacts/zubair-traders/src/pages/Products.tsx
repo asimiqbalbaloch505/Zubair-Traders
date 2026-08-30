@@ -188,7 +188,7 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
               <RefreshCw size={16} /> Purchase New Stock
             </Button>
             <Button onClick={() => setAddProductModal(true)} testId="button-add-product">
-              <PackagePlus size={16} /> Add product
+              <PackagePlus size={16} /> Add New product
             </Button>
           </div>
         } 
