@@ -185,7 +185,7 @@ export function Products({ PageIntro, Button, Field, Modal, Loading, Failed, Emp
         action={
           <div className="flex items-center gap-2">
             <Button onClick={() => setRestockModal(true)} variant="outline" testId="button-restock-stock">
-              <RefreshCw size={16} /> Restock
+              <RefreshCw size={16} /> Purchase New Stock
             </Button>
             <Button onClick={() => setAddProductModal(true)} testId="button-add-product">
               <PackagePlus size={16} /> Add product
