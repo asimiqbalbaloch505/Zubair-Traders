@@ -256,7 +256,7 @@ export function SupplierLedger({ PageIntro, Button, Modal, Loading, Failed, Empt
             </div>
             <div className="text-left sm:text-right">
               <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                Total Payable Balance
+                Total Unpaid Balance ( Udhaar)
               </span>
               <span className="font-mono text-lg font-bold text-amber-600">
                 {money(tableTotals.totalDue)}
