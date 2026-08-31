@@ -13,14 +13,14 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
         { data: purchases },
         { data: buyerPayments }
       ] = await Promise.all([
-        supabase.from('sales_invoices').select(`
+       supabase.from('sales_invoices').select(`
           *,
           buyers (name),
           sales_invoice_items (
+            product_id,
             quantity,
             unit_price,
-            unit_cost,
-            products (default_purchase_cost)
+            unit_cost
           )
         `).gt('total_amount', 0),
         supabase.from('products').select('*'),
@@ -69,11 +69,15 @@ export function useGetDashboard(filter: string = 'this_month', customMonth?: str
       const totalSales = filteredSales.reduce((acc, s) => acc + (Number(s.total_amount ?? s.totalAmount) || 0), 0);
       
       // 2. Cost of Goods Sold (COGS)
+      // 2. Cost of Goods Sold (COGS)
+      const productCostMap = new Map((products || []).map(p => [p.id, Number(p.default_purchase_cost || 0)]));
+
       const totalCogs = filteredSales.reduce((acc, s) => {
         const items = s.sales_invoice_items || [];
         const invoiceCogs = items.reduce((itemAcc: number, item: any) => {
           const qty = Number(item.quantity) || 0;
-          const cost = Number(item.unit_cost ?? item.products?.default_purchase_cost ?? 0);
+          const fallbackCost = productCostMap.get(item.product_id) || 0;
+          const cost = Number(item.unit_cost) > 0 ? Number(item.unit_cost) : fallbackCost;
           return itemAcc + (qty * cost);
         }, 0);
         return acc + invoiceCogs;
